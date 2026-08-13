@@ -32,10 +32,15 @@ Ext.define('PVE.Utils', {
             p: gettext('Premium'),
         },
 
+        // single place to adjust the Blue3 endpoints the UI links out to
+        blue3SiteURL: 'https://www.blue3.com.br/',
+        blue3DocsURL: 'https://docs.blue3.com.br/',
+        blue3SupportURL: 'https://suporte.blue3.com.br/',
+
         noSubKeyHtml:
             'You do not have a valid subscription for this server. Please visit ' +
-            '<a target="_blank" href="https://www.proxmox.com/en/proxmox-virtual-environment/pricing">' +
-            'www.proxmox.com</a> to get a list of available options.',
+            '<a target="_blank" href="https://www.blue3.com.br/">' +
+            'www.blue3.com.br</a> to get a list of available options.',
 
         getClusterSubscriptionLevel: async function () {
             let { result } = await Proxmox.Async.api2({ url: '/cluster/status' });

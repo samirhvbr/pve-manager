@@ -1,0 +1,73 @@
+/*
+ * Blue3 Cloud branding.
+ *
+ * Kept in its own file (instead of patched into ext6-pve.css) so that rebasing
+ * this fork onto a new upstream pve-manager only ever conflicts in the handful
+ * of files that genuinely had to change. Loaded last in index.html.tpl, after
+ * both ext6-pve.css and the optional theme-proxmox-dark.css, so these rules win.
+ *
+ * Only brand accents are recoloured here. Neutral backgrounds, selection and
+ * hover colours are deliberately left alone: they differ between the crisp and
+ * proxmox-dark themes, and overriding them from a single file would break
+ * whichever theme we did not write the rule for.
+ */
+
+:root {
+    --blue3-cyan: #29abe2;
+    --blue3-blue: #0071bc;
+    --blue3-grey: #a1a0a0;
+    --blue3-cyan-dim: rgba(41, 171, 226, 0.5);
+}
+
+/* header logo, sized to the 220x65 wordmark's aspect ratio */
+.blue3-logo > img {
+    display: block;
+    height: 28px;
+    width: auto;
+}
+
+/* brand accent under the top bar, replaces the plain theme border */
+.blue3-header {
+    border-bottom: 2px solid var(--blue3-cyan);
+}
+
+/* context menu headers, upstream paints these in the Proxmox blue #3892d4 */
+.x-menu-header {
+    background-color: var(--blue3-blue);
+}
+
+/* window headers, most visibly the login window */
+.x-window-header-default {
+    background-color: var(--blue3-blue);
+    border-color: var(--blue3-blue);
+}
+
+/* the active tab marker */
+.x-tab-active.x-tab-default-top {
+    border-bottom-color: var(--blue3-cyan);
+}
+
+.x-tab-active .x-tab-inner-default {
+    color: var(--blue3-blue);
+}
+
+/* progress bars: RRD/usage meters and the task progress window */
+.x-progress-default .x-progress-bar-default {
+    background-color: var(--blue3-blue);
+    background-image: linear-gradient(to right, var(--blue3-blue), var(--blue3-cyan));
+}
+
+/* keyboard focus ring, so tabbing through the UI stays on-brand */
+.x-form-focus,
+.x-form-text-wrap-focus,
+.x-btn-focus.x-btn-default-small,
+.x-btn-focus.x-btn-default-toolbar-small {
+    border-color: var(--blue3-cyan);
+    box-shadow: 0 0 0 1px var(--blue3-cyan-dim);
+}
+
+/* the "blue wrench" HA maintenance icon, same accent role as above */
+.x-tree-icon-custom.ha-maintenance:after,
+.x-grid-icon-custom.ha-maintenance:after {
+    color: var(--blue3-blue);
+}

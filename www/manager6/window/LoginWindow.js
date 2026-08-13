@@ -169,7 +169,7 @@ Ext.define('PVE.window.LoginWindow', {
 
             if (resp.failureType === 'connect') {
                 emsg = gettext(
-                    'Connection failure. Network error or Proxmox VE services not running?',
+                    'Connection failure. Network error or Blue3 Cloud services not running?',
                 );
             }
 
@@ -349,7 +349,7 @@ Ext.define('PVE.window.LoginWindow', {
     resizable: false,
     layout: 'auto',
 
-    title: gettext('Proxmox VE Login'),
+    title: gettext('Blue3 Cloud Login'),
 
     defaultFocus: 'usernameField',
     defaultButton: 'loginButton',

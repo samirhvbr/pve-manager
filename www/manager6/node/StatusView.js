@@ -160,7 +160,7 @@ Ext.define('PVE.node.StatusView', {
         me.items.push({
             xtype: 'pmxNodeInfoRepoStatus',
             itemId: 'repositoryStatus',
-            product: 'Proxmox VE',
+            product: 'Blue3 Cloud',
             repoLink: `#${repoLink}`,
         });
 

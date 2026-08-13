@@ -1,0 +1,17 @@
+# Opt-in do AUDITOR neste repositório (13/08/2026).
+# A presença deste arquivo é o opt-in; nenhuma chave aqui AMPLIA permissão — só
+# restringe (ADR-009 do skill-AUDITOR). Esquema: skill-AUDITOR/schemas/config.schema.json
+#
+# ⚠️ ESTADO REAL: o AUDITOR ainda NÃO tem executor headless. O ~/x/GIT/run.sh
+# apenas LISTA quem optou; o ciclo só acontece rodando /auditor numa sessão do
+# Claude Code. Este arquivo já deixa o repo pronto para quando o executor existir.
+
+agent: documentation-auditor
+model: claude-sonnet-5
+interval: 30m
+language: en-US
+
+write_policy: auditor-only   # garantido pelo gate (hooks/write-gate.py), não por esta chave
+open_pr_issue: ask           # default seguro: nada é aberto sem confirmação
+state_source: git
+auto_scheduler: false        # nunca instalar gatilho sozinho (ADR-008)

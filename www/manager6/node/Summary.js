@@ -125,9 +125,9 @@ Ext.define('PVE.node.Summary', {
         var version_btn = new Ext.Button({
             text: gettext('Package versions'),
             handler: function () {
-                Proxmox.Utils.checked_command(function () {
-                    me.showVersions();
-                });
+                // upstream wraps this in Proxmox.Utils.checked_command() to pop
+                // up the subscription notice first; intentionally dropped
+                me.showVersions();
             },
         });
 

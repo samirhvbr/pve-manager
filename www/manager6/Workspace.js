@@ -9,7 +9,7 @@
 Ext.define('PVE.Workspace', {
     extend: 'Ext.container.Viewport',
 
-    title: 'Proxmox Virtual Environment',
+    title: 'Blue3 Cloud',
 
     loginData: null, // Data from last login call
 
@@ -54,7 +54,8 @@ Ext.define('PVE.Workspace', {
                         sessionStorage.removeItem('openid-deeplink');
                         Ext.History.add(deeplink);
                     }
-                    Proxmox.Utils.checked_command(Ext.emptyFn); // display subscription status
+                    // upstream calls Proxmox.Utils.checked_command() here to pop
+                    // up the subscription notice; intentionally dropped
                 },
             });
         }
@@ -207,9 +208,9 @@ Ext.define('PVE.StdWorkspace', {
 
         if (PVE.VersionInfo) {
             let version = PVE.VersionInfo.version;
-            ui.update('Virtual Environment ' + version);
+            ui.update('Cloud ' + version);
         } else {
-            ui.update('Virtual Environment');
+            ui.update('Cloud');
         }
         ui.updateLayout();
     },
@@ -327,6 +328,7 @@ Ext.define('PVE.StdWorkspace', {
                     region: 'north',
                     title: gettext('Header'), // for ARIA
                     header: false, // avoid rendering the title
+                    cls: 'blue3-header',
                     layout: {
                         type: 'hbox',
                         align: 'middle',
@@ -339,13 +341,19 @@ Ext.define('PVE.StdWorkspace', {
                     margin: '2 0 2 5',
                     items: [
                         {
-                            xtype: 'proxmoxLogoSvg',
-                            prefix: 'pwt',
+                            // replaces upstream's 'proxmoxLogoSvg', which lives
+                            // in the widget toolkit and thus cannot be rebranded
+                            // from this package
+                            xtype: 'box',
+                            cls: 'blue3-logo',
+                            html:
+                                '<img src="/pve2/images/blue3-logo.png"' +
+                                ' alt="Blue3 Cloud" title="Blue3 Cloud" />',
                         },
                         {
                             minWidth: 150,
                             id: 'versioninfo',
-                            html: 'Virtual Environment',
+                            html: 'Cloud',
                             padding: '0 5',
                             style: {
                                 'font-size': '16px',
@@ -366,14 +374,17 @@ Ext.define('PVE.StdWorkspace', {
                             flex: 2,
                         },
                         {
-                            xtype: 'proxmoxHelpButton',
-                            hidden: false,
+                            // plain button instead of 'proxmoxHelpButton': the
+                            // latter always resolves to the locally shipped
+                            // pve-docs, we want our own documentation instead
+                            xtype: 'button',
                             baseCls: 'x-btn',
                             iconCls: 'fa fa-book x-btn-icon-el-default-toolbar-small ',
-                            listenToGlobalEvent: false,
-                            onlineHelp: 'pve_documentation_index',
                             text: gettext('Documentation'),
                             margin: '0 5 0 0',
+                            handler: function () {
+                                window.open(PVE.Utils.blue3DocsURL, '_blank', 'noreferrer');
+                            },
                         },
                         createVM,
                         createCT,
@@ -384,9 +395,9 @@ Ext.define('PVE.StdWorkspace', {
                             xtype: 'button',
                             baseCls: 'x-btn',
                             style: {
-                                // proxmox dark grey p light grey as border
-                                backgroundColor: '#464d4d',
-                                borderColor: '#ABBABA',
+                                // blue3 deep blue with the cyan as border
+                                backgroundColor: '#0071BC',
+                                borderColor: '#29ABE2',
                             },
                             iconCls: 'fa fa-user',
                             menu: [

@@ -1,3 +1,17 @@
+pve-manager (9.2.10+blue3.1) trixie; urgency=medium
+
+  * personalização inicial da marca Blue3 Cloud: nome do produto, logo,
+    favicons, paleta e títulos
+
+  * links externos apontando para a Blue3, centralizados em PVE.Utils
+
+  * remove o aviso de subscription no pós-login e em "Package versions"
+
+  * versão do fork no formato <upstream>+blue3.<N>: mantém o pacote acima do
+    oficial no apt sem esconder as releases futuras do Proxmox
+
+ -- Blue3 <samir@blue3.com.br>  Thu, 13 Aug 2026 16:14:34 -0300
+
 pve-manager (9.2.10) trixie; urgency=medium
 
   * pveperf: make bogomips regular expression case insensitive, other

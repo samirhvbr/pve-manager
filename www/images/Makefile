@@ -23,11 +23,19 @@ all:
 # xtermjs.svg was copied from the xtermjs-branding sources:
 # https://github.com/xtermjs/xtermjs-branding/blob/master/logo.svg
 
+# Blue3 branding assets, sourced from the blue3-logos/ directory in the repo
+# root: blue3-logo.png is the horizontal wordmark used in the header,
+# blue3-icon-* and blue3-favicon.ico are the standalone "wing" mark.
+
 IMAGES =			\
 	virt-viewer.svg		\
 	novnc.svg		\
 	xtermjs.svg		\
 	favicon.ico		\
+	blue3-logo.png		\
+	blue3-icon-128.png	\
+	blue3-icon-196.png	\
+	blue3-favicon.ico	\
 	proxmox_logo.png	\
 	logo-ceph.svg		\
 	logo-128.png		\

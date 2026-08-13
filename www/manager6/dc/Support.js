@@ -1,31 +1,33 @@
 Ext.define('PVE.dc.Support', {
     extend: 'Ext.panel.Panel',
     alias: 'widget.pveDcSupport',
-    pveGuidePath: '/pve-docs/index.html',
     onlineHelp: 'getting_help',
 
     invalidHtml: '<h1>No valid subscription</h1>' + PVE.Utils.noSubKeyHtml,
 
-    communityHtml:
-        'Please use the public community <a target="_blank" href="https://forum.proxmox.com">forum</a> for any questions.',
+    communityHtml: Ext.String.format(
+        'Please contact <a target="_blank" href="{0}">Blue3</a> for any questions.',
+        PVE.Utils.blue3SiteURL,
+    ),
 
-    activeHtml:
-        'Please use our <a target="_blank" href="https://my.proxmox.com">support portal</a> for any questions. You can also use the public community <a target="_blank" href="https://forum.proxmox.com">forum</a> to get additional information.',
+    activeHtml: Ext.String.format(
+        'Please use our <a target="_blank" href="{0}">support portal</a> for any questions.',
+        PVE.Utils.blue3SupportURL,
+    ),
 
-    bugzillaHtml:
-        '<h1>Bug Tracking</h1>Our bug tracking system is available <a target="_blank" href="https://bugzilla.proxmox.com">here</a>.',
+    bugzillaHtml: Ext.String.format(
+        '<h1>Bug Tracking</h1>Please report any issue through our ' +
+            '<a target="_blank" href="{0}">support portal</a>.',
+        PVE.Utils.blue3SupportURL,
+    ),
 
     docuHtml: function () {
-        var me = this;
-        var guideUrl = window.location.origin + me.pveGuidePath;
-        var text = Ext.String.format(
+        return Ext.String.format(
             '<h1>Documentation</h1>' +
-                'The official Proxmox VE Administration Guide' +
-                ' is included with this installation and can be browsed at ' +
+                'The Blue3 Cloud Administration Guide is available at ' +
                 '<a target="_blank" href="{0}">{0}</a>',
-            guideUrl,
+            PVE.Utils.blue3DocsURL,
         );
-        return text;
     },
 
     updateActive: function (data) {

@@ -1,0 +1,754 @@
+<title>Blindagem do PVE Blue3</title>
+<style>
+  :root {
+    --ground: #ffffff;
+    --surface: #f5f7f9;
+    --surface-2: #eceff3;
+    --code-bg: #f0f3f6;
+    --line: #d8dee6;
+    --line-soft: #e6ebf0;
+    --ink: #14181d;
+    --ink-2: #454f5b;
+    --ink-3: #6b7683;
+    --accent: #0071bc;
+    --accent-2: #29abe2;
+    --accent-wash: #e8f3fb;
+    --danger: #c0392b;
+    --danger-wash: #fbeceb;
+    --warn: #96650a;
+    --warn-wash: #fbf3e2;
+    --ok: #1b7a4b;
+
+    --f-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+    --f-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+      "Liberation Mono", monospace;
+
+    --step: clamp(1rem, 0.6rem + 1.6vw, 1.5rem);
+    --measure: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0e1216;
+      --surface: #161c22;
+      --surface-2: #1e262e;
+      --code-bg: #12181e;
+      --line: #2b353f;
+      --line-soft: #212a33;
+      --ink: #e6ebf0;
+      --ink-2: #b0bcc8;
+      --ink-3: #7d8b99;
+      --accent: #4db8ea;
+      --accent-2: #29abe2;
+      --accent-wash: #10222f;
+      --danger: #ff7a68;
+      --danger-wash: #2a1512;
+      --warn: #e0aa4a;
+      --warn-wash: #251c0c;
+      --ok: #4cc38a;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0e1216;
+    --surface: #161c22;
+    --surface-2: #1e262e;
+    --code-bg: #12181e;
+    --line: #2b353f;
+    --line-soft: #212a33;
+    --ink: #e6ebf0;
+    --ink-2: #b0bcc8;
+    --ink-3: #7d8b99;
+    --accent: #4db8ea;
+    --accent-2: #29abe2;
+    --accent-wash: #10222f;
+    --danger: #ff7a68;
+    --danger-wash: #2a1512;
+    --warn: #e0aa4a;
+    --warn-wash: #251c0c;
+    --ok: #4cc38a;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: clamp(2rem, 5vw, 4.5rem) clamp(1.1rem, 4vw, 2.5rem) 6rem;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.9rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 1.3rem + 3.2vw, 3.1rem);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    font-weight: 750;
+    text-wrap: balance;
+    margin: 0 0 1rem;
+  }
+
+  .standfirst {
+    font-size: clamp(1.05rem, 1rem + 0.4vw, 1.25rem);
+    color: var(--ink-2);
+    max-width: var(--measure);
+    margin: 0;
+    text-wrap: pretty;
+  }
+
+  .standfirst strong { color: var(--ink); font-weight: 650; }
+
+  .rule {
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2) 55%, transparent);
+    border: 0;
+    margin: 2.5rem 0;
+  }
+
+  /* ---------- decisions table ---------- */
+
+  .scroll-x { overflow-x: auto; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 34rem;
+    font-size: 0.94rem;
+  }
+
+  caption {
+    text-align: left;
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding-bottom: 0.7rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+  }
+
+  thead th {
+    font-size: 0.72rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 600;
+    border-bottom: 1px solid var(--line);
+  }
+
+  td:first-child {
+    font-family: var(--f-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    width: 2.5rem;
+  }
+
+  td:nth-child(2) { white-space: nowrap; font-weight: 600; }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--ink-3);
+    background: var(--surface);
+    border-radius: 0 6px 6px 0;
+    padding: 1.1rem 1.3rem;
+    margin: 1.6rem 0;
+  }
+
+  .note > :first-child { margin-top: 0; }
+  .note > :last-child { margin-bottom: 0; }
+
+  .note-label {
+    font-family: var(--f-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--ink-3);
+  }
+
+  .note.danger { border-left-color: var(--danger); background: var(--danger-wash); }
+  .note.danger .note-label { color: var(--danger); }
+  .note.warn { border-left-color: var(--warn); background: var(--warn-wash); }
+  .note.warn .note-label { color: var(--warn); }
+  .note.key { border-left-color: var(--accent); background: var(--accent-wash); }
+  .note.key .note-label { color: var(--accent); }
+
+  /* ---------- steps ---------- */
+
+  .steps { display: flex; flex-direction: column; gap: 2.6rem; margin-top: 2.6rem; }
+
+  .step {
+    display: grid;
+    grid-template-columns: 3.4rem 1fr;
+    gap: 0 1.4rem;
+    align-items: start;
+  }
+
+  .step-num {
+    font-family: var(--f-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--accent);
+    text-align: right;
+    padding-top: 0.15rem;
+    border-right: 2px solid var(--line);
+    padding-right: 0.8rem;
+    align-self: stretch;
+  }
+
+  .step.is-danger .step-num { color: var(--danger); border-right-color: var(--danger); }
+
+  .step-body { min-width: 0; }
+  .step-body > :first-child { margin-top: 0; }
+
+  h2 {
+    font-size: clamp(1.3rem, 1.15rem + 0.7vw, 1.6rem);
+    letter-spacing: -0.016em;
+    font-weight: 700;
+    line-height: 1.2;
+    text-wrap: balance;
+    margin: 0 0 0.8rem;
+  }
+
+  h3 {
+    font-size: 0.98rem;
+    font-weight: 680;
+    letter-spacing: -0.005em;
+    margin: 1.7rem 0 0.6rem;
+  }
+
+  p, ul, ol { max-width: var(--measure); }
+  p { margin: 0 0 1rem; text-wrap: pretty; }
+  ul, ol { margin: 0 0 1rem; padding-left: 1.3rem; }
+  li { margin-bottom: 0.4rem; }
+  li::marker { color: var(--ink-3); }
+
+  strong { font-weight: 650; }
+  a { color: var(--accent); text-underline-offset: 2px; }
+
+  code {
+    font-family: var(--f-mono);
+    font-size: 0.86em;
+    background: var(--surface-2);
+    padding: 0.12em 0.38em;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+    font-size: 0.85rem;
+    line-height: 1.65;
+  }
+
+  pre code { background: none; padding: 0; font-size: 1em; }
+  .cmt { color: var(--ink-3); }
+
+  /* ---------- checklist ---------- */
+
+  .check { list-style: none; padding: 0; max-width: var(--measure); }
+
+  .check li {
+    padding: 0.55rem 0 0.55rem 1.9rem;
+    border-bottom: 1px solid var(--line-soft);
+    position: relative;
+    margin: 0;
+  }
+
+  .check li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.95rem;
+    width: 0.95rem;
+    height: 0.95rem;
+    border: 1.5px solid var(--line);
+    border-radius: 3px;
+  }
+
+  .check li:last-child { border-bottom: 0; }
+  .check li.crit { font-weight: 620; }
+  .check li.crit::before { border-color: var(--accent); }
+
+  /* ---------- open items ---------- */
+
+  .open { display: flex; flex-direction: column; gap: 1rem; margin-top: 1.4rem; }
+
+  .open-item {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+    background: var(--surface);
+  }
+
+  .open-item h3 { margin-top: 0; }
+  .open-item p:last-child { margin-bottom: 0; }
+
+  .tag {
+    font-family: var(--f-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.45rem;
+    border-radius: 3px;
+    background: var(--warn-wash);
+    color: var(--warn);
+    border: 1px solid currentColor;
+    margin-left: 0.5rem;
+    vertical-align: 0.12em;
+    white-space: nowrap;
+  }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--line);
+    color: var(--ink-3);
+    font-size: 0.85rem;
+  }
+
+  :where(a, li) :focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 34rem) {
+    .step { grid-template-columns: 1fr; gap: 0.5rem; }
+    .step-num {
+      text-align: left;
+      border-right: 0;
+      border-left: 2px solid var(--line);
+      padding: 0 0 0 0.7rem;
+    }
+    .step.is-danger .step-num { border-left-color: var(--danger); }
+  }
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">Blue3 · Infraestrutura</p>
+  <h1>Blindagem do PVE</h1>
+  <p class="standfirst">
+    Como publicar <code>pve.blue3.cloud</code> <strong>sem expor a porta 8006 à
+    internet</strong>. Runbook operacional para o cluster Proxmox — siga na ordem.
+  </p>
+
+  <hr class="rule" />
+
+  <div class="scroll-x">
+    <table>
+      <caption>Decisões — 13/08/2026</caption>
+      <thead>
+        <tr><th>#</th><th>Item</th><th>Decisão</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>Acesso</td><td>WireGuard dedicado, separado do WG da Ubiquiti</td></tr>
+        <tr><td>2</td><td>DNS</td><td><code>pve.blue3.cloud</code> → IP interno, pelo DNS interno</td></tr>
+        <tr><td>3</td><td>Certificado</td><td>Let's Encrypt via ACME DNS-01 na Cloudflare</td></tr>
+        <tr><td>4</td><td>2FA</td><td>TOTP obrigatório no realm</td></tr>
+        <tr><td>5</td><td>Contas</td><td>Usuários nomeados; <code>root@pam</code> como break-glass</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note key">
+    <span class="note-label">A ordem importa</span>
+    <p>
+      O princípio: <strong>estabeleça o caminho seguro e comprove que ele
+      funciona antes de fechar qualquer porta.</strong> Inverter isso é como se
+      trancar do lado de fora — e num hypervisor o custo de recuperar é uma ida
+      ao datacenter.
+    </p>
+    <p>
+      O passo 7 é o único capaz de te deixar sem acesso à UI. Ele é o último de
+      propósito.
+    </p>
+  </div>
+
+  <p style="color: var(--ink-3); font-size: 0.9rem;">
+    Topologia: <strong style="color: var(--ink-2)">cluster</strong> — isso muda
+    o passo 7.
+  </p>
+
+  <div class="steps">
+
+    <!-- 0 -->
+    <section class="step">
+      <div class="step-num">00</div>
+      <div class="step-body">
+        <h2>Preflight</h2>
+        <p>Antes de qualquer coisa, <strong>no nó</strong>:</p>
+<pre><code>bash blue3-deploy/preflight.sh</code></pre>
+        <p>
+          Somente leitura — não altera nada, pode rodar em produção quantas
+          vezes quiser.
+        </p>
+        <p>
+          Ele monta a linha <code>ALLOW_FROM</code> <strong>pronta, a partir do
+          cluster real</strong> (lendo <code>corosync.conf</code>, com
+          <code>pvecm</code> de reserva). Esse é o valor que, errado, quebra a
+          UI entre nós no passo 7 — com um sintoma que não aponta para o arquivo
+          certo. Melhor a máquina montar do que digitar de memória.
+        </p>
+        <p>
+          Também avisa se <code>/etc/default/pveproxy</code> já existe (vai ser
+          sobrescrito), quais ferramentas faltam, e o estado de DNS e
+          certificado.
+        </p>
+      </div>
+    </section>
+
+    <!-- 1 -->
+    <section class="step">
+      <div class="step-num">01</div>
+      <div class="step-body">
+        <h2>WireGuard de gerência</h2>
+        <p>
+          Túnel dedicado, <strong>separado do WG da Ubiquiti</strong>. O da
+          Ubiquiti atende suporte e N3; alcance ao plano de controle do
+          hypervisor não deve vir junto com VPN de uso geral. Se uma credencial
+          de suporte vazar, o estrago para no que o suporte precisa acessar.
+        </p>
+        <p>Porta <strong>51821</strong>, para não colidir com a 51820 da Ubiquiti.</p>
+<pre><code>apt install wireguard-tools
+cd blue3-deploy/wireguard
+./gen-keys.sh pve01 samir joao   <span class="cmt"># chave por pessoa, nunca compartilhada</span>
+
+systemctl enable --now wg-quick@wg-mgmt
+wg show                          <span class="cmt"># deve listar os peers</span></code></pre>
+        <p>
+          Endereçamento: nós em <code>10.99.0.11-13</code>, admins a partir de
+          <code>10.99.0.101</code>.
+        </p>
+        <p>
+          <strong>Um túnel por nó, de propósito.</strong> Parece menos elegante
+          que um hub único, mas não tem ponto único de falha: se o nó de entrada
+          cair, você troca de túnel e continua com acesso ao cluster — que é
+          exatamente o momento em que você mais precisa dele.
+        </p>
+        <div class="note">
+          <span class="note-label">Valide antes de seguir</span>
+          <p style="margin-bottom:0.6rem">Handshake de pé e a UI respondendo pelo túnel:</p>
+<pre style="margin-bottom:0"><code>wg show
+curl -k https://10.99.0.11:8006/</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section class="step">
+      <div class="step-num">02</div>
+      <div class="step-body">
+        <h2>DNS interno</h2>
+<pre><code>pve.blue3.cloud.     A    10.99.0.11   <span class="cmt"># túnel do nó de entrada</span>
+pve01.blue3.cloud.   A    10.99.0.11
+pve02.blue3.cloud.   A    10.99.0.12
+pve03.blue3.cloud.   A    10.99.0.13</code></pre>
+        <p>
+          Apontar para o <strong>IP do túnel</strong> — e não para o IP de LAN —
+          mantém o desenho mínimo: o <code>AllowedIPs</code> do cliente fica só
+          em <code>10.99.0.0/24</code>, sem rotear a LAN de gerência para dentro
+          do WireGuard. Menos alcance no túnel, menos estrago se uma chave vazar.
+        </p>
+        <p>
+          O <code>DNS =</code> no config do cliente precisa apontar para o DNS
+          interno — senão o nome não resolve com o túnel de pé e o certificado
+          não valida.
+        </p>
+        <p>
+          <strong>Failover:</strong> se o nó de entrada cair, mude o A de
+          <code>pve.blue3.cloud</code> para outro nó. Por isso o passo 3 coloca
+          esse nome como SAN no certificado de <strong>todos</strong> os nós.
+        </p>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section class="step">
+      <div class="step-num">03</div>
+      <div class="step-body">
+        <h2>Let's Encrypt via Cloudflare</h2>
+        <div class="note key">
+          <span class="note-label">O ponto que confunde</span>
+          <p style="margin-bottom:0">
+            O DNS interno resolvendo <code>pve.blue3.cloud</code> não ajuda em
+            nada o Let's Encrypt. A validação DNS-01 exige um TXT em
+            <code>_acme-challenge.pve.blue3.cloud</code> na zona
+            <strong>pública autoritativa</strong> na Cloudflare. São duas coisas
+            separadas e você precisa das duas: o A interno para vocês chegarem,
+            o TXT público para a LE validar.
+          </p>
+        </div>
+        <p>
+          Como é DNS-01, a LE <strong>nunca precisa alcançar o nó</strong>. É o
+          que torna certificado válido compatível com zero exposição.
+        </p>
+
+        <h3>Token da Cloudflare</h3>
+        <p>Crie um <strong>API Token</strong> — não a Global API Key — com escopo mínimo:</p>
+        <ul>
+          <li><code>Zone → DNS → Edit</code></li>
+          <li><code>Zone → Zone → Read</code></li>
+          <li><strong>Zone Resources:</strong> apenas <code>blue3.cloud</code></li>
+        </ul>
+        <p>
+          A Global Key dá acesso à conta inteira; se vazar do nó, vocês perdem
+          todos os domínios, não só este.
+        </p>
+
+        <h3>No PVE</h3>
+        <p><code>Datacenter → ACME</code>:</p>
+        <ol>
+          <li><strong>Accounts → Add</strong> — e-mail de contato, ToS aceito</li>
+          <li><strong>Challenge Plugins → Add</strong> — tipo <code>DNS</code>, API <code>cloudflare</code>, campo <code>CF_Token</code></li>
+        </ol>
+        <p>Depois, <strong>em cada nó</strong>, <code>Node → Certificates → ACME</code>:</p>
+        <ol start="3">
+          <li>Domínio do nó (<code>pve01.blue3.cloud</code>), plugin = o criado acima</li>
+          <li><code>pve.blue3.cloud</code> como domínio adicional — é o que permite o failover sem aviso de certificado</li>
+          <li><strong>Order Certificates Now</strong></li>
+        </ol>
+        <p>
+          A renovação é automática, mas <strong>monitore</strong>: certificado
+          vencido em painel de gerência costuma ser descoberto no pior momento.
+        </p>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section class="step">
+      <div class="step-num">04</div>
+      <div class="step-body">
+        <h2>TOTP obrigatório no realm</h2>
+        <p><code>Datacenter → Realms → &lt;realm&gt; → Edit → Require TFA = OATH/TOTP</code></p>
+        <p>
+          Fazer no <strong>realm</strong> e não por usuário é o ponto: por
+          usuário, você depende de cada pessoa lembrar de ativar. No realm, é
+          obrigatório para todo mundo — agora e para quem entrar depois.
+        </p>
+        <p>Cada usuário cadastra o próprio TOTP no menu do usuário → <strong>TFA</strong>.</p>
+        <div class="note warn">
+          <span class="note-label">Nota honesta sobre TOTP</span>
+          <p style="margin-bottom:0">
+            TOTP é <em>phishable</em> — um proxy reverso malicioso captura o
+            código e reusa dentro da janela de validade. WebAuthn não cai nisso,
+            porque é ligado à origem. Com o 8006 alcançável só pelo WireGuard, o
+            atacante teria que estar dentro do túnel, então TOTP aqui é
+            defensável. <strong>Se um dia abrirem mais o acesso, revisitem isto
+            primeiro.</strong>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section class="step">
+      <div class="step-num">05</div>
+      <div class="step-body">
+        <h2>Contas nomeadas</h2>
+        <p>
+          <code>root@pam</code> <strong>não pode ser removido</strong> — é a
+          conta break-glass do PVE, por desenho. O objetivo não é eliminá-la, é
+          tirá-la do uso diário:
+        </p>
+        <ol>
+          <li><code>Datacenter → Permissions → Users</code> — um usuário nomeado por pessoa</li>
+          <li><code>Administrator</code> no path <code>/</code> a quem precisa</li>
+          <li><strong>TOTP em cada um</strong>, inclusive no <code>root@pam</code></li>
+          <li>Senha longa e aleatória no <code>root@pam</code>, guardada em cofre — não na cabeça de ninguém, não em planilha</li>
+          <li>Dia a dia só com conta nomeada</li>
+        </ol>
+        <p>
+          O ganho concreto é rastreabilidade: com todo mundo entrando como
+          <code>root</code>, o log de tarefas não responde <em>"quem apagou esta
+          VM?"</em>. Com conta nomeada, responde.
+        </p>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section class="step">
+      <div class="step-num">06</div>
+      <div class="step-body">
+        <h2>Firewall do PVE</h2>
+        <p>
+          <code>Datacenter → Firewall</code> — regra de entrada permitindo 8006
+          apenas de <code>10.99.0.0/24</code> e dos IPs de LAN dos nós.
+        </p>
+        <p>
+          Cinto e suspensório junto com o passo 7: são mecanismos independentes,
+          e é justamente por isso que valem os dois.
+        </p>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="step is-danger">
+      <div class="step-num">07</div>
+      <div class="step-body">
+        <h2>Travar o pveproxy — por último</h2>
+        <div class="note danger">
+          <span class="note-label">Pare e leia</span>
+          <p>Este passo é o único que pode te trancar fora da interface web.</p>
+          <ul style="margin-bottom:0">
+            <li>Faça com <strong>SSH ou console físico já aberto</strong></li>
+            <li><strong>Não feche</strong> essa sessão até confirmar que o login web funciona</li>
+            <li>Rollback: apague <code>/etc/default/pveproxy</code> e <code>systemctl restart pveproxy</code></li>
+          </ul>
+        </div>
+        <p>
+          Copie <code>pveproxy/pveproxy.default</code> →
+          <code>/etc/default/pveproxy</code>, preencha os IPs, e
+          <code>systemctl restart pveproxy</code>.
+        </p>
+
+        <h3>Cluster: o erro que custa caro</h3>
+        <p>
+          O <code>pveproxy</code> encaminha chamadas de API <strong>entre
+          nós</strong> pela própria 8006. Se os IPs dos outros nós não estiverem
+          no <code>ALLOW_FROM</code>, o login funciona normalmente e a UI só
+          quebra ao navegar para outro nó — um sintoma que não aponta para cá.
+          Você vai procurar em corosync, em rede, em tudo menos no arquivo certo.
+        </p>
+        <p>
+          Inclua sempre: sub-rede do WG + IP de LAN de <strong>todos</strong> os
+          nós + <code>127.0.0.1</code>.
+        </p>
+
+        <h3>Verifique de verdade</h3>
+<pre><code>bash blue3-deploy/verify.sh</code></pre>
+        <p>
+          Confere WireGuard, <code>ALLOW_FROM</code> (inclusive se algum nó do
+          cluster ficou de fora), certificado, SAN e fail2ban. Sai com código 1
+          se algo falhou.
+        </p>
+        <p>
+          Mas atenção ao que ele <strong>não</strong> consegue provar: seu
+          acesso continuar funcionando <strong>não prova</strong> que o bloqueio
+          funciona — prova só que você não se bloqueou. Nenhum script rodando no
+          próprio nó fecha isso. Teste os dois lados à mão:
+        </p>
+<pre><code><span class="cmt"># de dentro do túnel: deve responder</span>
+curl -k https://10.99.0.11:8006/
+
+<span class="cmt"># de um IP que DEVE ser bloqueado: deve falhar</span>
+curl -k --max-time 5 https://&lt;ip-lan-nao-listado&gt;:8006/
+
+<span class="cmt"># navegue entre os nós na UI — é aqui que erro de cluster aparece</span></code></pre>
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section class="step">
+      <div class="step-num">08</div>
+      <div class="step-body">
+        <h2>fail2ban</h2>
+<pre><code>apt install fail2ban
+cp fail2ban/pve-blue3-filter.conf /etc/fail2ban/filter.d/pve-blue3.conf
+cp fail2ban/pve-blue3-jail.conf   /etc/fail2ban/jail.d/pve-blue3.conf</code></pre>
+        <div class="note warn">
+          <span class="note-label">Valide o regex antes de confiar nele</span>
+<pre style="margin-bottom:0.8rem"><code><span class="cmt"># erre uma senha de propósito na UI, depois:</span>
+grep -i "authentication failure" /var/log/daemon.log | tail -5
+fail2ban-regex /var/log/daemon.log /etc/fail2ban/filter.d/pve-blue3.conf</code></pre>
+          <p style="margin-bottom:0">
+            Se <code>Matched</code> vier zero, ajuste o <code>failregex</code>.
+            <strong>Um jail que não casa nada falha em silêncio</strong> e dá
+            falsa sensação de proteção — pior que não ter jail nenhum.
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <hr class="rule" />
+
+  <h2>Pendências de verificação</h2>
+  <p>
+    Dois pontos que não deu para confirmar na máquina onde este runbook foi
+    escrito. Tratem como não verificados até o teste passar.
+  </p>
+
+  <div class="open">
+    <div class="open-item">
+      <h3>Semântica de <code>POLICY</code> no pveproxy <span class="tag">testar</span></h3>
+      <p>
+        O <code>libpve-http-server-perl</code>, que interpreta
+        <code>ALLOW_FROM</code>/<code>DENY_FROM</code>/<code>POLICY</code>, não
+        estava instalado. <code>allow</code> é a receita canônica do PVE, mas só
+        o teste de bloqueio do passo 7 confirma.
+      </p>
+    </div>
+    <div class="open-item">
+      <h3>Formato do log de falha de senha <span class="tag">testar</span></h3>
+      <p>
+        A linha vem do <code>pve-access-control</code>, pacote fora do
+        repositório do <code>pve-manager</code>. O que existe <em>neste</em>
+        repo é outra coisa — <code>PVE/HTTPServer.pm:89,101</code> emite
+        <code>"authentication failure: ..."</code> para ticket/token inválido, e
+        essa linha <strong>não traz o IP do cliente</strong>, então não serve
+        para o fail2ban.
+      </p>
+    </div>
+  </div>
+
+  <hr class="rule" />
+
+  <h2>Checklist final</h2>
+  <ul class="check">
+    <li><code>wg show</code> mostra handshake</li>
+    <li><code>pve.blue3.cloud</code> resolve para o IP do túnel</li>
+    <li>Cadeado verde, sem aviso de certificado</li>
+    <li><code>pve.blue3.cloud</code> como SAN em <strong>todos</strong> os nós</li>
+    <li>Login exige TOTP</li>
+    <li><code>root@pam</code> com TOTP e senha em cofre</li>
+    <li class="crit">Navegação entre nós funciona <strong>depois</strong> do passo 7</li>
+    <li class="crit">Acesso de IP não listado é recusado — testado, não presumido</li>
+    <li><code>fail2ban-regex</code> casa linhas reais</li>
+    <li class="crit">8006 <strong>não</strong> responde da internet — confirme de fora da rede</li>
+  </ul>
+
+  <footer>
+    O último item é o que fecha o objetivo. Vale testar de um link externo, não
+    de dentro da rede de vocês. · Configurações em
+    <code>blue3-deploy/</code> no repositório do fork.
+  </footer>
+
+</div>

@@ -1,0 +1,23 @@
+# Config do lado do ADMIN (notebook / estação).
+# Um arquivo por NÓ que você queira alcançar -- wg-pve01.conf, wg-pve02.conf...
+# No dia a dia você sobe só o do nó de entrada.
+
+[Interface]
+Address    = 10.99.0.101/32
+PrivateKey = <PRIVATE_KEY_DO_ADMIN>
+
+# DNS interno da Blue3, para pve.blue3.cloud resolver enquanto o túnel está de pé.
+# Sem isso o nome não resolve com o túnel ativo e o certificado não valida.
+DNS = <IP_DO_DNS_INTERNO>
+
+[Peer]
+# pve01
+PublicKey    = <PUBLIC_KEY_DO_NO>
+PresharedKey = <PRESHARED_KEY>
+Endpoint     = <IP_PUBLICO_OU_DNS_DO_NO>:51821
+
+# Só a sub-rede do túnel. NÃO coloque 0.0.0.0/0 nem a LAN inteira aqui:
+# este túnel existe para alcançar a interface de gerência do PVE, e nada mais.
+AllowedIPs = 10.99.0.0/24
+
+PersistentKeepalive = 25

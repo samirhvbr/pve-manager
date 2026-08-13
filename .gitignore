@@ -11,3 +11,46 @@ dest/
 /pve-manager-[0-9]*/
 /test/.mocked_*
 /test/*.tmp
+
+# --- Blue3 -----------------------------------------------------------------
+# Segredos de deploy. Uma chave de WireGuard versionada dá acesso ao plano de
+# controle do cluster inteiro.
+#
+# Config de WireGuard é só um ".conf" e o nome varia por instalação — wg0.conf,
+# wireguard.conf, wg-mgmt.conf. Lista de nomes sempre esquece um. E uma regra
+# ampla "*.conf" seria pior ainda: sumiria em silêncio com os .conf legítimos
+# do upstream (configs/pve-blacklist.conf, configs/pve-initramfs.conf,
+# configs/vzdump.conf, services/ceph-after-pve-cluster.conf), que fazem parte
+# do pacote .deb.
+#
+# Por isso o inverso: ignora o DIRETÓRIO inteiro e readmite só o que pode
+# entrar. Arquivo novo ali nasce ignorado — que é o padrão certo para um
+# diretório cujo conteúdo default é segredo.
+/blue3-deploy/wireguard/*
+!/blue3-deploy/wireguard/*.example
+!/blue3-deploy/wireguard/gen-keys.sh
+!/blue3-deploy/wireguard/README.md
+
+# Rede de segurança para chaves em qualquer lugar do repo.
+# Verificado: nenhum .key/.pem versionado no upstream, então não quebra o build.
+*.key
+*.pem
+
+# Configuração de deploy preenchida com IPs/tokens reais
+/blue3-deploy/pveproxy/pveproxy.default.local
+
+# blue3-logos/ é a FONTE dos assets de marca, mas chegou com 31 MB de um
+# template admin AngularJS sem relação nenhuma com PVE (ckeditor, jquery, gulp)
+# e ~1 MB de libs vendorizadas. Versiona só os ~660 KB que são a marca.
+#
+# Isto não é só higiene: o COMMITTER roda `git add -A` em cron e, pelo SPEC
+# dele, "não julga lixo — se lixo entra, o defeito é do .gitignore do repo".
+# Sem esta regra, os 31 MB iriam para o remoto no próximo ciclo, e tirar depois
+# exige reescrever histórico.
+/blue3-logos/*
+!/blue3-logos/*.png
+!/blue3-logos/*.ico
+!/blue3-logos/code.txt
+
+# Overrides pessoais do Claude Code
+.claude/settings.local.json

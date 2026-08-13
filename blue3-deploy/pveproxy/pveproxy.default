@@ -1,0 +1,45 @@
+# /etc/default/pveproxy
+#
+# Chaves confirmadas em PVE/Service/pveproxy.pm:75-121 desta versão.
+#
+# >>> LEIA ANTES DE APLICAR <<<
+# Errar aqui te tranca fora da interface web. Aplique com uma sessão SSH ou um
+# console físico JÁ ABERTO e só feche depois de confirmar que o login web
+# funciona. Rollback = apagar este arquivo e `systemctl restart pveproxy`.
+
+# --- Quem pode falar com a 8006 -------------------------------------------
+# Em CLUSTER isto é crítico: o pveproxy encaminha chamadas de API entre nós
+# pela própria 8006. Se os IPs dos outros nós não estiverem no ALLOW_FROM, o
+# login funciona mas a UI quebra ao navegar para outro nó -- e o sintoma não
+# aponta para cá, então você perde tempo procurando no lugar errado.
+#
+# Inclua SEMPRE:
+#   1. a sub-rede do túnel WireGuard de gerência
+#   2. o IP de LAN de TODOS os nós do cluster (inclusive o próprio)
+#   3. localhost
+ALLOW_FROM="10.99.0.0/24,<IP_LAN_PVE01>,<IP_LAN_PVE02>,<IP_LAN_PVE03>,127.0.0.1"
+DENY_FROM="all"
+
+# ATENÇÃO: não consegui verificar a semântica exata de POLICY nesta máquina --
+# o libpve-http-server-perl (que interpreta estas chaves) não está instalado
+# aqui. "allow" é a receita canônica do PVE, mas TESTE antes de confiar:
+# depois do restart, confirme de um IP que DEVE ser bloqueado que ele é mesmo
+# bloqueado. Não assuma pelo fato de o seu acesso continuar funcionando.
+POLICY="allow"
+
+# --- TLS -------------------------------------------------------------------
+# Só cifras com forward secrecy e AEAD. Corta RSA key exchange e CBC.
+CIPHERS="ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256"
+CIPHERSUITES="TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256"
+HONOR_CIPHER_ORDER="1"
+
+# --- Não usados neste desenho ---------------------------------------------
+# Sem reverse proxy na frente, então PROXY_REAL_IP_HEADER e
+# PROXY_REAL_IP_ALLOW_FROM ficam de fora DE PROPÓSITO. Habilitar o header de
+# real-IP sem restringir quem pode enviá-lo deixa qualquer cliente forjar o
+# próprio IP de origem -- e aí o fail2ban bane o endereço que o atacante
+# escolher, não o dele.
+#
+# LISTEN_IP também fica de fora: em cluster, prender a 8006 num único IP
+# costuma quebrar o proxy entre nós. O controle de acesso aqui é o
+# ALLOW_FROM/DENY_FROM acima, somado ao firewall.

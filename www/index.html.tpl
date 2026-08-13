@@ -4,9 +4,11 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>[% nodename %] - Proxmox Virtual Environment</title>
-    <link rel="icon" sizes="128x128" href="/pve2/images/logo-128.png" />
-    <link rel="apple-touch-icon" sizes="128x128" href="/pve2/images/logo-128.png" />
+    <title>[% nodename %] - Blue3 Cloud</title>
+    <link rel="icon" href="/pve2/images/blue3-favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="128x128" href="/pve2/images/blue3-icon-128.png" />
+    <link rel="icon" type="image/png" sizes="196x196" href="/pve2/images/blue3-icon-196.png" />
+    <link rel="apple-touch-icon" sizes="196x196" href="/pve2/images/blue3-icon-196.png" />
     <link rel="stylesheet" type="text/css" href="/pve2/ext6/theme-crisp/resources/theme-crisp-all.css?ver=7.0.0" />
     <link rel="stylesheet" type="text/css" href="/pve2/ext6/crisp/resources/charts-all.css?ver=7.0.0" />
     <link rel="stylesheet" type="text/css" href="/pve2/fa/css/font-awesome.css" />
@@ -20,6 +22,8 @@
     <link rel="stylesheet" type="text/css" media="(prefers-color-scheme: dark)" href="/pwt/themes/theme-proxmox-dark.css?ver=[% wtversion %]" />
       [%- END -%]
     [%- END -%]
+    <!-- Blue3 branding, loaded last so it overrides both ext6-pve.css and the theme -->
+    <link rel="stylesheet" type="text/css" href="/pve2/css/blue3.css?ver=[% version %]" />
 
     [% IF langfile %]
     <script type='text/javascript' src='/pve2/locale/pve-lang-[% lang %].js?v=[% i18n_js_mtime %]'></script>

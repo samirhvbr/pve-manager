@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment_perfil": "PERFIL OPUS-ONLY — Opus 5 em tudo, janela 1M explicita via sufixo [1m] no model. NAO adicionar CLAUDE_CODE_DISABLE_1M_CONTEXT aqui: e ela que derruba a janela pra 200K. effortLevel maximo aceito em arquivo e 'xhigh'; 'max' so por sessao (/effort max ou CLAUDE_CODE_EFFORT_LEVEL=max no env).",
+  "model": "opus[1m]",
+  "effortLevel": "xhigh",
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5"
+  },
+  "_comment_autoMode": "O classificador do auto mode e uma camada SEPARADA das regras de permissions. Por padrao ele bloqueia escrita no proprio settings.json (o agente poderia ampliar as proprias permissoes). '$defaults' mantem todas as regras embutidas; a linha seguinte abre so este caso. Mantenha a regra ESTREITA — 'allow' generico aqui desliga o classificador na pratica.",
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Creating or editing .claude/settings.json, .claude/settings.local.json and .claude/README.md inside this project directory. The repository owner has explicitly opted in to this. Writes to settings files anywhere else, including the user-level ~/.claude/settings.json, are NOT covered by this rule."
+    ]
+  },
+  "permissions": {
+    "_comment": "Permissões do fork Blue3 do pve-manager — stack Perl/ExtJS/Debian",
+    "defaultMode": "plan",
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(node --check:*)",
+      "Bash(perl -c:*)",
+      "Bash(bash -n:*)",
+      "Bash(shellcheck:*)",
+      "Bash(make -C www/images install DESTDIR=/tmp/*)",
+      "Bash(make -C www/css install DESTDIR=/tmp/*)",
+      "Bash(make check:*)",
+      "Bash(make tidy:*)",
+      "Bash(make clean:*)",
+      "Bash(proxmox-biome lint:*)",
+      "Bash(proxmox-biome format:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(file:*)",
+      "Bash(identify:*)"
+    ],
+    "deny": [
+      "Read(./blue3-deploy/**/keys-*/**)",
+      "Read(./blue3-deploy/**/*.key)",
+      "Read(**/wg-mgmt.conf)",
+      "Read(**/*.pem)",
+      "Read(**/*privkey*)",
+      "Read(/etc/pve/**)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push * --force*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -fd:*)",
+      "Bash(curl * | sh:*)",
+      "Bash(curl * | bash:*)",
+      "Bash(wget * | sh:*)",
+      "Bash(wget * | bash:*)",
+      "Bash(dpkg -i:*)",
+      "Bash(apt install:*)",
+      "Bash(apt-get install:*)",
+      "Bash(systemctl restart pveproxy:*)",
+      "Bash(systemctl stop pveproxy:*)",
+      "Bash(systemctl restart pvedaemon:*)",
+      "Bash(pvesh delete:*)",
+      "Bash(pvesm remove:*)",
+      "Bash(qm destroy:*)",
+      "Bash(pct destroy:*)"
+    ],
+    "ask": [
+      "Bash(sudo:*)",
+      "Bash(make install:*)",
+      "Bash(make deb:*)",
+      "Bash(make dinstall:*)",
+      "Bash(dpkg-buildpackage:*)",
+      "Bash(pvesh:*)",
+      "Bash(pveum:*)",
+      "Bash(wg:*)",
+      "Bash(wg-quick:*)",
+      "Bash(systemctl:*)"
+    ]
+  }
+}

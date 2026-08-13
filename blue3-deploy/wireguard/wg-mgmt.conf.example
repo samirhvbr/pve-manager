@@ -1,0 +1,42 @@
+# /etc/wireguard/wg-mgmt.conf  --  lado do NÓ PVE
+#
+# Túnel de GERÊNCIA, dedicado e separado do WireGuard da Ubiquiti.
+# O WG da Ubiquiti atende suporte e N3; alcance ao plano de controle do
+# hypervisor não deve vir junto com VPN de uso geral.
+#
+# Porta 51821 de propósito: evita colisão e confusão com a 51820 que o
+# concentrador da Ubiquiti provavelmente já usa.
+#
+# Um túnel POR NÓ. O admin sobe o túnel do nó que quer acessar. Se um nó cair,
+# você troca de túnel e continua com acesso ao cluster -- que é exatamente
+# quando você mais precisa dele.
+
+[Interface]
+# IP deste nó dentro do túnel de gerência.
+#   pve01 = 10.99.0.11   pve02 = 10.99.0.12   pve03 = 10.99.0.13
+Address    = 10.99.0.11/24
+ListenPort = 51821
+PrivateKey = <PRIVATE_KEY_DESTE_NO>
+
+# Sem PostUp de forwarding: este túnel serve só para alcançar o próprio nó.
+# Nada de rotear a LAN de gerência para dentro do WG -- quanto menos alcance o
+# túnel dá, menor o estrago se uma chave de peer vazar.
+
+# ---------------------------------------------------------------------------
+# Peers = administradores. Um bloco por pessoa, nunca uma chave compartilhada:
+# chave por pessoa é o que permite revogar acesso individual sem rotacionar
+# tudo, e é o que faz o log dizer QUEM entrou.
+# ---------------------------------------------------------------------------
+
+[Peer]
+# admin: samir
+PublicKey           = <PUBLIC_KEY_DO_ADMIN>
+PresharedKey        = <PRESHARED_KEY>
+AllowedIPs          = 10.99.0.101/32
+PersistentKeepalive = 25
+
+# [Peer]
+# admin: <nome>
+# PublicKey    = <...>
+# PresharedKey = <...>
+# AllowedIPs   = 10.99.0.102/32
