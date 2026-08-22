@@ -1,10 +1,7 @@
 # Opt-in do COMMITTER neste repositório (ADR-004 do skill-COMMITTER).
 # A presença deste arquivo é o opt-in; as chaves só RESTRINGEM (SPEC.md §2).
 # Varredura: ~/x/GIT/run.sh (cron de 30 min) descobre quem tem este marcador.
-# PAUSADO em 14/08/2026 para corrigir a mensagem do commit 6844a3d0 (prefixo
-# saiu como "9.2.10", versão do upstream, em vez de "9.2.10+blue3.1").
-# Reative para true assim que o force-push estiver feito.
-enabled: false
+enabled: true
 push: true
 branch_only: master
 fallback: sonnet
