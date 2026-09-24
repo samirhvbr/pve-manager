@@ -1,40 +1,47 @@
-# Configuração Claude Code — Blue3 Cloud (fork pve-manager)
+# Claude Code configuration — Blue3 Cloud (pve-manager fork)
 
-## Modelo
+## Model
 
-Perfil **Opus-only**: `opus[1m]` com janela de 1M, `effortLevel: xhigh`.
-Subagentes também em Opus.
+**This repository does not choose the model** (repodocs ADR-027). The model is
+the user's choice, made per session with `/model`, and a subagent inherits the
+session's model. `.claude/settings.json` carries no `model`, no
+`fallbackModel`, and nothing in `env` that steers one.
 
-## Permissões críticas
+`effortLevel: xhigh` stays in the file — that is the highest level a settings
+file accepts; `/effort max` raises it for a single session.
 
-O que este projeto tem de diferente dos outros repos Blue3:
+## Critical permissions
 
-### Bloqueado (deny)
+What this project has that the other Blue3 repos do not:
 
-- **Chaves WireGuard** — `keys-*/`, `*.key`, `wg-mgmt.conf`. São as chaves que
-  dão acesso ao plano de controle do cluster; agente nenhum precisa lê-las.
-- **`/etc/pve/**`** — configuração viva do cluster. Este repo é o *fonte*, não
-  o sistema em produção.
-- **`systemctl restart/stop pveproxy|pvedaemon`** — derruba a interface web de
-  quem estiver usando. Se precisar, o operador faz.
-- **`qm destroy` / `pct destroy` / `pvesh delete`** — destroem VMs e recursos.
-- **`apt install` / `dpkg -i`** — instalar pacote é decisão do operador.
+### Blocked (deny)
 
-### Pergunta antes (ask)
+- **WireGuard keys** — `keys-*/`, `*.key`, `wg-mgmt.conf`. These are the keys
+  that grant access to the cluster's control plane; no agent needs to read them.
+- **`/etc/pve/**`** — the live cluster configuration. This repo is the *source*,
+  not the production system.
+- **`systemctl restart/stop pveproxy|pvedaemon`** — takes down the web interface
+  for whoever is using it. If it is needed, the operator does it.
+- **`qm destroy` / `pct destroy` / `pvesh delete`** — they destroy VMs and
+  resources.
+- **`apt install` / `dpkg -i`** — installing a package is the operator's call.
 
-- **`make install`** sem `DESTDIR` escreve direto em `/usr/share/pve-manager`.
-  Com `DESTDIR=/tmp/...` está liberado, porque é como se testa o build.
-- **`pvesh` / `pveum`** — API e gestão de usuários do PVE. Leitura é útil,
-  escrita precisa de aval.
-- **`wg` / `wg-quick`** — mexem no túnel de gerência.
+### Asks first (ask)
 
-### Liberado
+- **`make install`** without `DESTDIR` writes straight into
+  `/usr/share/pve-manager`. With `DESTDIR=/tmp/...` it is allowed, because that
+  is how the build gets tested.
+- **`pvesh` / `pveum`** — the PVE API and user management. Reading is useful,
+  writing needs approval.
+- **`wg` / `wg-quick`** — they touch the management tunnel.
 
-Validação de sintaxe (`node --check`, `perl -c`, `bash -n`), lint
-(`proxmox-biome`), busca, e `make ... install DESTDIR=/tmp/*` para testar
-empacotamento sem tocar no sistema.
+### Allowed
 
-## Modo padrão
+Syntax validation (`node --check`, `perl -c`, `bash -n`), lint
+(`proxmox-biome`), search, and `make ... install DESTDIR=/tmp/*` to test
+packaging without touching the system.
 
-`plan` — este é um fork de um sistema de virtualização em produção. Ver o plano
-antes da execução vale o atrito.
+## Default mode
+
+`plan` — this is a fork of a virtualization system in production. Seeing the
+plan before the execution is worth the friction.
