@@ -307,7 +307,9 @@ my $our_properties = {
 my sub merge_properties {
     my ($from, $to) = @_;
 
-    if (my $props = $to->{properties}) {
+    if ($to->{properties} || !($to->{allOf} || $to->{oneOf})) {
+        # Plain parameter schemas may omit an empty property map.
+        my $props = $to->{properties} //= {};
         $props->{$_} = $from->{$_} for keys $from->%*;
         return;
     }
@@ -322,8 +324,6 @@ my sub merge_properties {
     } elsif ($to->{oneOf}) {
         my $old = { $to->%* };
         $to->%* = (allOf => [$old, $from]);
-    } else {
-        die "unknown schema type (not an object?)\n";
     }
 }
 

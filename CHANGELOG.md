@@ -9,6 +9,22 @@ Entrada nova sempre **no topo**. Ver [CLAUDE.md](CLAUDE.md) para a convenção.
 
 ---
 
+## 9.2.20+blue3.1 — Merge upstream pve-manager 9.2.20 and redeploy the fork
+
+An `apt upgrade` on the `blue3-lab` nodes replaced `9.2.10+blue3.1` with the
+stock `pve-manager 9.2.20`, since `9.2.10+blue3.1 < 9.2.20` and nothing held the
+package. That ordering is by design (apt must keep seeing upstream releases),
+so the fix is to follow upstream, not to fight the version scheme.
+
+- Merged upstream `49318c67` (bump version to 9.2.20, 116 commits) into the
+  fork. Merged rather than rebased, so `master` history is not rewritten.
+- Only two fork-touched files moved upstream: `debian/changelog` (conflict,
+  resolved by stacking the fork entries) and `www/manager6/Utils.js`
+  (auto-merged, Blue3 URLs intact).
+- No new subscription-nag or Proxmox-branding spots were introduced upstream.
+- `pve-manager` is now on `apt-mark hold` on the nodes, so the next
+  `apt upgrade` lists it as kept back instead of silently reverting the fork.
+
 ## 9.2.10+blue3.1 — personalização inicial da marca e blindagem de acesso
 
 Primeira entrega do fork, sobre o pve-manager 9.2.10.
