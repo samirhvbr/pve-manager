@@ -22,10 +22,13 @@ Cluster `blue3-lab`, quorado, link único no `ens18` (rede de gerência).
 > reinstalled, and put on hold. Procedure and reasoning:
 > [upstream-sync.md](upstream-sync.md).
 >
-> The cluster now has a **third member**: `b3p1` (`100.64.65.160`, physical
-> Xeon E5-2680 v2, 377 GiB), running the B3DEV-WORK and AI-BENCHMARK guests.
-> It still runs the stock `pve-manager 9.2.20`. The fork was not installed
-> there.
+> The cluster now has a **third member**: `b3p1` (`100.64.65.160`,
+> `b3p1.b3.local`, physical Xeon E5-2680 v2, 377 GiB), running the B3DEV-WORK
+> and AI-BENCHMARK guests. It got the same `9.2.20+blue3.1` package (same
+> sha256) the same day, also on hold. The running guests kept their PIDs
+> through the install. Root SSH works directly: `ssh root@100.64.65.160`.
+> Prefix remote commands with `LC_ALL=C`, because the node lacks the `pt_BR`
+> locale that the workstation forwards.
 
 ---
 

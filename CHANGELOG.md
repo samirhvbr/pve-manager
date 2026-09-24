@@ -35,8 +35,9 @@ so the fix is to follow upstream, not to fight the version scheme.
 - Both nodes report `pve-manager/9.2.20+blue3.1/cdabba49`, serve
   `<title><node> - Blue3 Cloud</title>`, answer HTTP 200 for the Blue3 assets,
   and stay quorate.
-- The third cluster member `b3p1` was left on the stock 9.2.20. See
-  `.continue/README_20260924.md`, item 0.
+- The third cluster member `b3p1` (physical, running guests) got the same
+  package, same sha256, and the same hold. Its guests kept running through
+  the install. All three nodes report `repoid cdabba49`.
 - New: [`docs/upstream-sync.md`](docs/upstream-sync.md), the procedure for the
   next upstream release.
 
