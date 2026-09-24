@@ -51,16 +51,6 @@
       "Read(**/*.pem)",
       "Read(**/*privkey*)",
       "Read(/etc/pve/**)",
-      "Bash(rm -rf:*)",
-      "Bash(git push --force:*)",
-      "Bash(git push -f:*)",
-      "Bash(git push * --force*)",
-      "Bash(git reset --hard:*)",
-      "Bash(git clean -fd:*)",
-      "Bash(curl * | sh:*)",
-      "Bash(curl * | bash:*)",
-      "Bash(wget * | sh:*)",
-      "Bash(wget * | bash:*)",
       "Bash(dpkg -i:*)",
       "Bash(apt install:*)",
       "Bash(apt-get install:*)",
@@ -74,6 +64,7 @@
     ],
     "ask": [
       "Bash(sudo:*)",
+      "Bash(rm -rf:*)",
       "Bash(make install:*)",
       "Bash(make deb:*)",
       "Bash(make dinstall:*)",
@@ -82,7 +73,11 @@
       "Bash(pveum:*)",
       "Bash(wg:*)",
       "Bash(wg-quick:*)",
-      "Bash(systemctl:*)"
+      "Bash(systemctl:*)",
+      "Bash(curl * | sh:*)",
+      "Bash(curl * | bash:*)",
+      "Bash(wget * | sh:*)",
+      "Bash(wget * | bash:*)"
     ]
   }
 }
