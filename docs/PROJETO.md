@@ -6,7 +6,7 @@
 
 ## Objetivo
 
-Transformar o `pve-manager` (Proxmox VE 9.2.10) num produto white-label
+Transformar o `pve-manager` (Proxmox VE 9.2.20) num produto white-label
 **Blue3 Cloud**, publicado em `pve.blue3.cloud`, com acesso restrito e — no
 médio prazo — capacidade de vender frações do cluster para empresas clientes que
 gerenciam os próprios usuários.

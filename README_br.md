@@ -1,6 +1,6 @@
 # Blue3 Cloud
 
-Fork white-label do **`pve-manager`** (Proxmox VE 9.2.10), com a marca
+Fork white-label do **`pve-manager`** (Proxmox VE 9.2.20), com a marca
 **Blue3 Cloud**.
 
 🇺🇸 [English version](README.md)
@@ -118,7 +118,7 @@ funcionando.
 ## Versionamento
 
 `version.md` na raiz é a fonte da verdade, no formato
-**`<upstream>+blue3.<N>`** — hoje `9.2.10+blue3.1`.
+**`<upstream>+blue3.<N>`** — hoje `9.2.20+blue3.1`.
 
 `<upstream>` é a release do Proxmox em que o fork está baseado; muda só no
 rebase, e aí `<N>` volta para `1`. `<N>` incrementa a cada entrega do fork. O

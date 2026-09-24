@@ -1,6 +1,6 @@
 # Blue3 Cloud
 
-White-label fork of **`pve-manager`** (Proxmox VE 9.2.10), rebranded as
+White-label fork of **`pve-manager`** (Proxmox VE 9.2.20), rebranded as
 **Blue3 Cloud**.
 
 🇧🇷 [Versão em português](README_br.md)
@@ -114,7 +114,7 @@ bash -n <script>.sh
 ## Versioning
 
 `version.md` at the root is the source of truth, in the format
-**`<upstream>+blue3.<N>`** — currently `9.2.10+blue3.1`.
+**`<upstream>+blue3.<N>`** — currently `9.2.20+blue3.1`.
 
 `<upstream>` is the Proxmox release this fork is based on; it changes only on a
 rebase, and `<N>` resets to `1`. `<N>` increments on each fork delivery.
@@ -126,6 +126,10 @@ The `+` prefix is not cosmetic — verified with `dpkg --compare-versions`:
 |--------|----------|
 | `blue3.1` | **Invalid Debian syntax** and sorts above *every* upstream version, so apt would never report a Proxmox update again — security fixes included. |
 | `9.2.10+blue3.1` | Valid. Greater than `9.2.10` (our build beats the official package) and less than `9.2.11` (apt still reports upstream releases). |
+
+apt also *installs* those upstream releases unless the package is held, so
+every node running the fork has `apt-mark hold pve-manager`. See
+[docs/upstream-sync.md](docs/upstream-sync.md) for how to follow upstream.
 
 Commits follow `9.2.10+blue3.1 - change description`, built by the COMMITTER
 skill from the `version.md` changelog entry.

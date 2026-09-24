@@ -11,10 +11,21 @@ nos dois — rollback disponível.
 | FQDN | `b3pve1.blue3.cloud` | `b3pve2.blue3.cloud` |
 | RAM · vCPU | 8 GB · 4 | 4 GB · 4 |
 | `/` · `/var` | 20 G · 22 G | 20 G · 22 G |
-| PVE | 9.2.10 · kernel 7.0.14-11-pve | idem |
-| Fork | **9.2.10+blue3.1** | **9.2.10+blue3.1** |
+| PVE | 9.2.20 · kernel 7.0.14-19-pve | idem |
+| Fork | **9.2.20+blue3.1** | **9.2.20+blue3.1** |
+| `pve-manager` | on `apt-mark hold` | on `apt-mark hold` |
 
 Cluster `blue3-lab`, quorado, link único no `ens18` (rede de gerência).
+
+> **Updated 2026-09-24.** On 2026-09-21 an `apt upgrade` reverted both nodes
+> to the stock `pve-manager 9.2.20`. The fork was merged onto 9.2.20, rebuilt,
+> reinstalled, and put on hold. Procedure and reasoning:
+> [upstream-sync.md](upstream-sync.md).
+>
+> The cluster now has a **third member**: `b3p1` (`100.64.65.160`, physical
+> Xeon E5-2680 v2, 377 GiB), running the B3DEV-WORK and AI-BENCHMARK guests.
+> It still runs the stock `pve-manager 9.2.20`. The fork was not installed
+> there.
 
 ---
 
@@ -112,6 +123,12 @@ dpkg -i ../pve-manager_9.2.10+blue3.1_all.deb
 O `.deb` sai em `/root/pve-manager/`, não em `/root` — o Makefile compila num
 subdiretório e escreve no pai. O `git rev-parse` do Makefile exige o `.git`
 presente e `git config --global --add safe.directory` quando o dono difere.
+
+> **From 9.2.20 on, build as a non-root user.** Upstream's
+> `test/CephKeyMigrationScript_test.pl` expects a *must run as root* refusal,
+> so two tests fail when the build runs as root. The 9.2.20+blue3.1 build ran
+> as `samir` on b3pve1, in `~samir/build-9.2.20/`. See
+> [upstream-sync.md](upstream-sync.md), step 6.
 
 ---
 

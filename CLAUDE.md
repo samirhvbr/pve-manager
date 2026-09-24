@@ -21,7 +21,7 @@ antes: `git fetch && git status`.
 
 ## O que este repositório é
 
-Um **fork white-label do `pve-manager`** (Proxmox VE 9.2.10) com a marca
+Um **fork white-label do `pve-manager`** (Proxmox VE 9.2.20) com a marca
 **Blue3 Cloud**. Não é um projeto novo: é uma camada de personalização sobre um
 upstream vivo, que continua recebendo commits.
 
@@ -130,7 +130,7 @@ que está funcionando.
 ## Versionamento
 
 `version.md` na raiz é a fonte da verdade, como nos outros projetos Blue3.
-Formato: **`<upstream>+blue3.<N>`** — hoje `9.2.10+blue3.1`.
+Formato: **`<upstream>+blue3.<N>`** — hoje `9.2.20+blue3.1`.
 
 - **`<upstream>`** — a versão do Proxmox em que este fork está baseada. Muda só
   quando rebasear (`9.2.10` → `9.2.11`), e aí `<N>` volta para `1`.
@@ -157,6 +157,15 @@ Reproduza com:
 dpkg --compare-versions "9.2.10+blue3.1" gt 9.2.10 && echo "vence o oficial"
 dpkg --compare-versions "9.2.10+blue3.1" lt 9.2.11 && echo "ainda avisa do update"
 ```
+
+### apt doesn't just report the upstream release, it installs it
+
+Learned on 2026-09-21: an `apt upgrade` replaced `9.2.10+blue3.1` with the stock
+`9.2.20` on both lab nodes, because nothing held the package. **Every node
+running the fork must have `apt-mark hold pve-manager`.** With the hold, the new
+upstream version still shows as *kept back*, so we still see it, but it no
+longer reverts the fork silently. How to follow upstream (merge, build as
+non-root, install, hold): [docs/upstream-sync.md](docs/upstream-sync.md).
 
 ---
 
@@ -257,6 +266,8 @@ optou; o ciclo roda por `/auditor` numa sessão do Claude Code.
 - [SECURITY.md](SECURITY.md) — diretrizes de segurança
 - [docs/PROJETO.md](docs/PROJETO.md) — escopo e objetivos
 - [docs/branding.md](docs/branding.md) — o que foi personalizado e onde
+- [docs/upstream-sync.md](docs/upstream-sync.md) — following a new upstream
+  release without losing the fork (merge, non-root build, `apt-mark hold`)
 - [docs/multi-tenancy.md](docs/multi-tenancy.md) — o que o PVE suporta de
   multi-tenancy (e o que não suporta)
 - [blue3-deploy/README.md](blue3-deploy/README.md) — runbook de blindagem

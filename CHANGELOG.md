@@ -25,6 +25,21 @@ so the fix is to follow upstream, not to fight the version scheme.
 - `pve-manager` is now on `apt-mark hold` on the nodes, so the next
   `apt upgrade` lists it as kept back instead of silently reverting the fork.
 
+**Deployed and verified (b3pve1, b3pve2)**
+
+- `make check`: biome over 376 files and all Perl tests pass. `lintian` shows
+  only the upstream groff man-page warnings.
+- The build must run as a non-root user. As root, upstream's
+  `CephKeyMigrationScript_test.pl` fails tests 375 and 376, which expect a
+  *must run as root* refusal.
+- Both nodes report `pve-manager/9.2.20+blue3.1/cdabba49`, serve
+  `<title><node> - Blue3 Cloud</title>`, answer HTTP 200 for the Blue3 assets,
+  and stay quorate.
+- The third cluster member `b3p1` was left on the stock 9.2.20. See
+  `.continue/README_20260924.md`, item 0.
+- New: [`docs/upstream-sync.md`](docs/upstream-sync.md), the procedure for the
+  next upstream release.
+
 ## 9.2.10+blue3.1 — personalização inicial da marca e blindagem de acesso
 
 Primeira entrega do fork, sobre o pve-manager 9.2.10.
