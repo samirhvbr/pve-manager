@@ -101,7 +101,8 @@ fail2ban) — **não entra no build do .deb**. Diretório novo, que o upstream n
 terá, então nunca conflita.
 
 It also holds `web-redirect/web-redirect.sh`, which serves the UI on 80/443 and
-is installed on every node. A new server follows
+is installed on every node, and `cluster/renumber-vms.sh`, which clears VMID
+conflicts before a host joins. A new server follows
 [docs/new-node.md](docs/new-node.md), which lists everything a node needs
 beyond the stock PVE install.
 
@@ -277,6 +278,10 @@ optou; o ciclo roda por `/auditor` numa sessão do Claude Code.
   cluster (fork + hold, web redirect, access)
 - [docs/access.md](docs/access.md) — colleague accounts: one user, one pool,
   scoped ACLs, and what PVE cannot limit
+- [docs/cluster.md](docs/cluster.md) — cluster members, the vote rule
+  (physical host = 3, entry-point VM = 1) and the open router-NAT issue
+- [docs/join-existing-host.md](docs/join-existing-host.md) — joining a host
+  that already runs guests, without restarting any of them
 - [docs/multi-tenancy.md](docs/multi-tenancy.md) — o que o PVE suporta de
   multi-tenancy (e o que não suporta)
 - [blue3-deploy/README.md](blue3-deploy/README.md) — runbook de blindagem

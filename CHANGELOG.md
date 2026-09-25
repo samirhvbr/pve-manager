@@ -11,6 +11,38 @@ Entrada nova sempre **no topo**. Ver [CLAUDE.md](CLAUDE.md) para a convenção.
 
 ## 9.2.20+blue3.1 — Merge upstream pve-manager 9.2.20 and redeploy the fork
 
+**2026-09-25: spx1 joins the cluster, and the vote rule**
+
+The package is unchanged. Only the cluster changed, and nothing was
+restarted: spx1's 11 running guests kept the same PIDs from before the join
+until after the fork install.
+
+- **Vote rule:** physical host = 3, entry-point VM = 1. b3p1 went from 1 to 3
+  votes, and spx1 joined with `--votes 3`. The reason is that b3pve1 and
+  b3pve2 are VMs 111 and 112 on spx1. With equal votes, a reboot of spx1
+  would have left the cluster without quorum, and then no guest autostarts.
+  See [`docs/cluster.md`](docs/cluster.md).
+- **Renumbered on b3p1:** 100/101/102 → 200/201/202, to clear VMID conflicts
+  with spx1. The running VMs were down for under a minute each. The
+  colleague's template ACL moved to `/vms/200`. New
+  [`blue3-deploy/cluster/renumber-vms.sh`](blue3-deploy/cluster/renumber-vms.sh)
+  does this (`plan` first, then `run`).
+- **spx1 joined with `--force`.** Its guest configs, 4 storages (restricted to
+  spx1), an API token with its original secret, and a group were
+  restored from a pre-join backup. Its local admin user was not migrated, on
+  purpose. The unused Ceph (0 OSDs, 0 pools) was purged before the join. The
+  node certificate that the join failed to generate was regenerated with
+  `pvecm updatecerts --force`.
+- **spx1 runs the fork** on hold, with the 80/443 redirect.
+- **Named admin account** on the `pve` realm, with `Administrator` on `/`.
+  `root@pam` stays as break-glass.
+- **Open issue:** the router source-NATs traffic addressed to spx1, so spx1
+  cannot form corosync links with b3pve1 and b3pve2. corosync is stopped on
+  those two until the router is fixed, and the cluster runs 6 of 8, quorate.
+  See [`docs/cluster.md`](docs/cluster.md), *Known issue*.
+- New docs: [`docs/cluster.md`](docs/cluster.md) and
+  [`docs/join-existing-host.md`](docs/join-existing-host.md).
+
 **2026-09-25: web UI on 80/443, and the first colleague account**
 
 The package is unchanged, so the version stays the same. Both changes are

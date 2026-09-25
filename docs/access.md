@@ -27,7 +27,7 @@ for s in b3p1-hdd b3p1-ssd b3p1-iso; do
     pveum acl modify /storage/$s --users $U --roles PVEDatastoreUser
 done
 pveum acl modify /sdn/zones/localnetwork/vmbr0 --users $U --roles PVESDNUser
-pveum acl modify /vms/100       --users $U --roles PVETemplateUser   # clone blue3-debian
+pveum acl modify /vms/200       --users $U --roles PVETemplateUser   # clone blue3-debian
 pveum acl modify /nodes/b3p1    --users $U --roles PVEAuditor        # see node load
 ```
 
@@ -37,7 +37,7 @@ pveum acl modify /nodes/b3p1    --users $U --roles PVEAuditor        # see node 
 | `/pool/<P>` | `PVEPoolUser` | See the pool, so it can be chosen in the create wizard |
 | `/storage/<id>` | `PVEDatastoreUser` | Create disks there, or use its ISOs |
 | `/sdn/zones/localnetwork/vmbr0` | `PVESDNUser` | Attach NICs to `vmbr0` (on every node) with any VLAN tag, because the ACL propagates |
-| `/vms/100` | `PVETemplateUser` | Clone the `blue3-debian` template (not modify it) |
+| `/vms/200` | `PVETemplateUser` | Clone the `blue3-debian` template (VMID 200 since 2026-09-25; it was 100) |
 | `/nodes/b3p1` | `PVEAuditor` | Read-only node summary: free RAM and CPU for sizing |
 
 **The pool is mandatory when creating.** `VM.Allocate` is granted on the pool,
@@ -94,6 +94,18 @@ Other things that are not granted today, and what granting them takes:
    secret.
 3. The colleague changes it on first login (user menu → *Password*), and
    enrolls TOTP (user menu → *TFA*).
+
+## Named admins
+
+Admins get their own `pve` account with `Administrator` on `/`. That role
+applies to every node, including hosts that join later. `root@pam` stays as
+break-glass, as in step 5 of the runbook
+([blue3-deploy/README.md](../blue3-deploy/README.md)). Hand the password over
+the same way as above.
+
+When a host with local users joins the cluster, its users, ACLs and
+passwords are dropped. See [join-existing-host.md](join-existing-host.md).
+Recreate only the accounts you still want, and scope them on purpose.
 
 ## Revoking
 

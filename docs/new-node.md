@@ -1,6 +1,6 @@
 # Adding a server to the cluster
 
-**Written:** 2026-09-25 · **Applies to:** cluster `blue3-lab` (b3pve1, b3pve2, b3p1)
+**Written:** 2026-09-25 · **Applies to:** cluster `blue3-lab` (b3p1, spx1, b3pve1, b3pve2)
 
 Checklist for a new node, in order. Each step links to the document with the
 detail. Nothing here is packaged in the `.deb`. The node-side configuration
@@ -18,10 +18,20 @@ lives in [`blue3-deploy/`](../blue3-deploy/) and is applied per node.
 
 ## 2. Join the cluster
 
+A **physical host joins with 3 votes**. Target a physical member (b3p1), not
+a VM that may run on the host being joined:
+
 ```bash
-pvecm add <ip-of-an-existing-node>
-pvecm status | grep -E 'Quorate|Nodes'
+pvecm add 100.64.65.160 --votes 3
+pvecm status | grep -E 'Quorate|Total votes'
+corosync-cfgtool -s        # on EVERY node: every other node "connected"
 ```
+
+Why 3 votes: [cluster.md](cluster.md). If the host **already runs guests**,
+stop here and follow [join-existing-host.md](join-existing-host.md). The join
+wipes the host's `/etc/pve`, VMIDs must be unique, and SSH keys disappear
+until quorum. If any link shows *disconnected*, check for NAT on the path, as
+described in [cluster.md](cluster.md) under *Known issue*.
 
 ## 3. Install the fork, and hold it
 
