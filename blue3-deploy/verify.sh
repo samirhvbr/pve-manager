@@ -132,6 +132,8 @@ cat <<EOF
 
   2. 8006 INALCANÇÁVEL da internet — teste de um link externo, celular no 4G
      serve. Este é o item que fecha o objetivo do projeto inteiro.
+     With blue3-web-redirect installed, 80 and 443 reach the same pveproxy:
+     test those too.
 
   3. NAVEGAÇÃO entre nós na UI, com o túnel de pé. É aqui que erro de
      ALLOW_FROM em cluster aparece — e o sintoma não aponta para o arquivo.

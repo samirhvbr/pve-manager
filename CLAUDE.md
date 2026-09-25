@@ -100,6 +100,11 @@ enigma:
 fail2ban) — **não entra no build do .deb**. Diretório novo, que o upstream nunca
 terá, então nunca conflita.
 
+It also holds `web-redirect/web-redirect.sh`, which serves the UI on 80/443 and
+is installed on every node. A new server follows
+[docs/new-node.md](docs/new-node.md), which lists everything a node needs
+beyond the stock PVE install.
+
 ---
 
 ## Limites do ambiente de desenvolvimento
@@ -268,6 +273,10 @@ optou; o ciclo roda por `/auditor` numa sessão do Claude Code.
 - [docs/branding.md](docs/branding.md) — o que foi personalizado e onde
 - [docs/upstream-sync.md](docs/upstream-sync.md) — following a new upstream
   release without losing the fork (merge, non-root build, `apt-mark hold`)
+- [docs/new-node.md](docs/new-node.md) — checklist for adding a server to the
+  cluster (fork + hold, web redirect, access)
+- [docs/access.md](docs/access.md) — colleague accounts: one user, one pool,
+  scoped ACLs, and what PVE cannot limit
 - [docs/multi-tenancy.md](docs/multi-tenancy.md) — o que o PVE suporta de
   multi-tenancy (e o que não suporta)
 - [blue3-deploy/README.md](blue3-deploy/README.md) — runbook de blindagem

@@ -11,6 +11,26 @@ Entrada nova sempre **no topo**. Ver [CLAUDE.md](CLAUDE.md) para a convenção.
 
 ## 9.2.20+blue3.1 — Merge upstream pve-manager 9.2.20 and redeploy the fork
 
+**2026-09-25: web UI on 80/443, and the first colleague account**
+
+The package is unchanged, so the version stays the same. Both changes are
+node-side configuration.
+
+- New [`blue3-deploy/web-redirect/web-redirect.sh`](blue3-deploy/web-redirect/web-redirect.sh),
+  installed on all three nodes. It adds an nft table that redirects
+  connections addressed to the node on 80 and 443 to 8006, plus a unit that
+  reloads it at boot. Typing the bare IP in a browser now opens the UI. It is a
+  port redirect rather than nginx so that pveproxy keeps seeing real client
+  IPs: behind a proxy, everyone would be `127.0.0.1`, which `ALLOW_FROM`
+  allows. Not tested yet: surviving a reboot.
+- First colleague account on the `pve` realm, with its own pool and ACLs
+  scoped to the pool, three storages, `vmbr0` and the `blue3-debian`
+  template. Verified by logging in as the colleague: they could create, turn
+  into a template, clone and destroy in their pool, and got 403 on everything
+  outside it.
+- New docs: [`docs/new-node.md`](docs/new-node.md), the checklist for adding a
+  server, and [`docs/access.md`](docs/access.md), the colleague-account recipe.
+
 An `apt upgrade` on the `blue3-lab` nodes replaced `9.2.10+blue3.1` with the
 stock `pve-manager 9.2.20`, since `9.2.10+blue3.1 < 9.2.20` and nothing held the
 package. That ordering is by design (apt must keep seeing upstream releases),

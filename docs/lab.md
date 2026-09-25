@@ -17,6 +17,10 @@ nos dois — rollback disponível.
 
 Cluster `blue3-lab`, quorado, link único no `ens18` (rede de gerência).
 
+Since 2026-09-25, every node also serves the UI on 80/443: typing just the IP
+in a browser opens it. See [new-node.md](new-node.md), step 4. The first
+colleague account exists too: [access.md](access.md).
+
 > **Updated 2026-09-24.** On 2026-09-21 an `apt upgrade` reverted both nodes
 > to the stock `pve-manager 9.2.20`. The fork was merged onto 9.2.20, rebuilt,
 > reinstalled, and put on hold. Procedure and reasoning:
