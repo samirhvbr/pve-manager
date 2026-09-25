@@ -17,16 +17,13 @@ nos dois — rollback disponível.
 
 Cluster `blue3-lab`, quorado, link único no `ens18` (rede de gerência).
 
-> **Since 2026-09-25 the cluster also holds the physical hosts**: b3p1 and
-> spx1. b3pve1 and b3pve2 turned out to be **VMs 111 and 112 on spx1**
-> (confirmed by MAC). They now serve as UI entry points with 1 vote each,
-> while the physical hosts have 3. Topology, votes and the open NAT issue:
-> [cluster.md](cluster.md). How spx1 joined with 16 guests and no restart:
-> [join-existing-host.md](join-existing-host.md). b3p1's VMs were renumbered
-> 100/101/102 → 200/201/202 to clear VMID conflicts with spx1.
->
-> **Do not roll back snapshots of b3pve1/b3pve2** while they are members:
-> see [cluster.md](cluster.md).
+> **2026-09-25: b3pve1 and b3pve2 left the cluster.** They are VMs 111 and
+> 112 on spx1. For a few hours they were members of the production cluster,
+> which now holds only the physical hosts (b3p1, spx1). They are standalone
+> PVE again, with the fork, and their use is being decided. Why they left:
+> [cluster.md](cluster.md), *History*. How spx1 joined with 16 guests and no
+> restart: [join-existing-host.md](join-existing-host.md). b3p1's VMs were
+> renumbered 100/101/102 → 200/201/202 to clear VMID conflicts with spx1.
 
 Since 2026-09-25, every node also serves the UI on 80/443: typing just the IP
 in a browser opens it. See [new-node.md](new-node.md), step 4. The first

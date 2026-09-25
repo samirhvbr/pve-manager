@@ -278,8 +278,8 @@ optou; o ciclo roda por `/auditor` numa sessão do Claude Code.
   cluster (fork + hold, web redirect, access)
 - [docs/access.md](docs/access.md) — colleague accounts: one user, one pool,
   scoped ACLs, and what PVE cannot limit
-- [docs/cluster.md](docs/cluster.md) — cluster members, the vote rule
-  (physical host = 3, entry-point VM = 1) and the open router-NAT issue
+- [docs/cluster.md](docs/cluster.md) — cluster members (physical hosts
+  only), the 3-vote rule, and why the entry-point VMs were removed
 - [docs/join-existing-host.md](docs/join-existing-host.md) — joining a host
   that already runs guests, without restarting any of them
 - [docs/multi-tenancy.md](docs/multi-tenancy.md) — o que o PVE suporta de

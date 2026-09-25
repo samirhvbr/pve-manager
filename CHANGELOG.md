@@ -36,10 +36,15 @@ until after the fork install.
 - **spx1 runs the fork** on hold, with the 80/443 redirect.
 - **Named admin account** on the `pve` realm, with `Administrator` on `/`.
   `root@pam` stays as break-glass.
-- **Open issue:** the router source-NATs traffic addressed to spx1, so spx1
-  cannot form corosync links with b3pve1 and b3pve2. corosync is stopped on
-  those two until the router is fixed, and the cluster runs 6 of 8, quorate.
-  See [`docs/cluster.md`](docs/cluster.md), *Known issue*.
+- **Router source NAT:** traffic from VLAN 1001 to spx1 arrives from the
+  public address, so spx1 could not link with b3pve1 and b3pve2. See
+  [`docs/cluster.md`](docs/cluster.md), *History*.
+- **b3pve1 and b3pve2 were then removed from the cluster.** Any member
+  serves the whole cluster's UI, so dedicated entry-point VMs added
+  correlated votes and the NAT problem, and nothing else. Both were separated
+  to standalone, then `pvecm delnode`, then their directories and root SSH
+  keys were removed on both sides. The cluster is b3p1 + spx1: 6 of 6 votes,
+  quorum 4.
 - New docs: [`docs/cluster.md`](docs/cluster.md) and
   [`docs/join-existing-host.md`](docs/join-existing-host.md).
 

@@ -125,6 +125,7 @@ step 4 (web redirect).
   an empty `/etc/pve` and no working SSH key. The router source-NATs traffic
   to spx1 (see [cluster.md](cluster.md)). Stopping corosync on the two
   unreachable members let spx1 and b3p1 form quorum on their own (6 of 8).
-  The join then finished by itself, restore included.
+  The join then finished by itself, restore included. The two VMs were
+  removed from the cluster the same day ([cluster.md](cluster.md), *History*).
 - **The certificate was not generated**, and `pvecm updatecerts --force`
   fixed it.

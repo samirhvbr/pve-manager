@@ -1,6 +1,6 @@
 # Adding a server to the cluster
 
-**Written:** 2026-09-25 · **Applies to:** cluster `blue3-lab` (b3p1, spx1, b3pve1, b3pve2)
+**Written:** 2026-09-25 · **Applies to:** cluster `blue3-lab` (b3p1, spx1)
 
 Checklist for a new node, in order. Each step links to the document with the
 detail. Nothing here is packaged in the `.deb`. The node-side configuration
@@ -31,7 +31,7 @@ Why 3 votes: [cluster.md](cluster.md). If the host **already runs guests**,
 stop here and follow [join-existing-host.md](join-existing-host.md). The join
 wipes the host's `/etc/pve`, VMIDs must be unique, and SSH keys disappear
 until quorum. If any link shows *disconnected*, check for NAT on the path, as
-described in [cluster.md](cluster.md) under *Known issue*.
+described in [cluster.md](cluster.md) under *History*.
 
 ## 3. Install the fork, and hold it
 
