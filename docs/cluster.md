@@ -64,6 +64,12 @@ They turned out to be **VMs 111 and 112 on spx1**, which caused two problems:
   rule placed before the NAT rule. It is **still worth doing**, because every
   service on spx1 sees VLAN 1001 clients as the public IP. But it no longer
   affects the cluster.
+- **Seen again on 2026-10-20, on b3p1.** Browsers on the internal office
+  network (10.100.100.0/22) reach b3p1 from the router's *public* addresses,
+  according to `pvedaemon`'s auth log. That matters for the hardening runbook:
+  `ALLOW_FROM` (step 7) and fail2ban (step 8) only ever see the router.
+  Allow-listing that address admits everyone behind the NAT, and banning it
+  locks everyone out. Fix the srcnat before those two steps.
 
 Because every member serves the whole cluster's UI anyway, they were removed
 instead: separated to standalone (corosync config deleted, corosync disabled,
