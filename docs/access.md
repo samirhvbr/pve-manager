@@ -95,6 +95,37 @@ Other things that are not granted today, and what granting them takes:
 3. The colleague changes it on first login (user menu → *Password*), and
    enrolls TOTP (user menu → *TFA*).
 
+## VM admins: group `vmadmins`
+
+**Created:** 2026-10-20, for a colleague helping with VM migrations.
+
+This is for a colleague who runs **every** guest in the cluster, not just a
+pool: create, edit, delete, console, snapshot and migrate between nodes. It
+covers VMs and containers on every node, including production. Grant it
+through the group, so the next person needs one command:
+
+```bash
+pveum group add vmadmins
+pveum acl modify /vms                    --groups vmadmins --roles PVEVMAdmin
+pveum acl modify /storage                --groups vmadmins --roles PVEDatastoreUser
+pveum acl modify /sdn/zones/localnetwork --groups vmadmins --roles PVESDNUser   # every bridge
+pveum acl modify /nodes                  --groups vmadmins --roles PVEAuditor   # read-only node view
+
+pveum user modify <user>@pve --groups vmadmins    # note: replaces the user's group list
+```
+
+Checked with `pvesh get /access/permissions --userid <user> --path <path>`.
+Members get `VM.Allocate`, `VM.Config.*`, `VM.PowerMgmt` and `VM.Migrate`
+on every VM, `Datastore.AllocateSpace` on every storage, and `SDN.Use` on
+every bridge. They **do not** get a host shell (`Sys.Console`), host or
+network changes (`Sys.Modify`), or user and permission management. Pool
+selection is no longer mandatory for them, because `VM.Allocate` comes from
+`/vms`.
+
+Still root-only, or not granted: uploading ISOs (`Datastore.AllocateTemplate`),
+LXC `keyctl`, device passthrough, and remote migration from another cluster
+(`Sys.Incoming`). With this much reach, **enroll TOTP** for these accounts.
+
 ## Named admins
 
 Admins get their own `pve` account with `Administrator` on `/`. That role
