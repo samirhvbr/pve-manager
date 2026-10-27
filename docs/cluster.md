@@ -1,6 +1,6 @@
 # Cluster `blue3-lab` — topology and quorum
 
-**As of:** 2026-09-25 · Every node runs `pve-manager 9.2.20+blue3.1` on hold
+**As of:** 2026-10-27 · Every node runs `pve-manager 9.2.20+blue3.1` on hold
 
 One cluster that holds every physical host. **Any member serves the UI for the
 whole cluster.** There is no dedicated entry-point node. Use
@@ -43,6 +43,43 @@ With two hosts, both must be up for quorum:
 
 A third physical host (9 votes, quorum 5), or a QDevice on an independent
 machine, lets any single host fail.
+
+## Bridges
+
+Both nodes have the same two bridges, with the same names, so a guest's
+config works on either node and ACLs on `/sdn/zones/localnetwork/<bridge>`
+cover both.
+
+| Bridge | Port | Kind | What it carries |
+|---|---|---|---|
+| `vmbr0` | `nic4` (10G) | plain; tagged NICs get `vmbr0v<tag>` | management, corosync, and the guests' LAN and VLANs |
+| `vmbr1` | `nic5`, the 10G card's second port, with no SFP and no link | plain, comment `Telefonia` | nothing beyond the node |
+
+`vmbr1` mirrors the bridge of the same name on the standalone host that guests
+are migrating from ([guest-migration.md](guest-migration.md)). That bridge's
+port has no link either. Guests in the same VLAN on `vmbr1` reach each other
+**on the same node**. Copies on different nodes do not see each other, and
+nothing leaves the node.
+
+- **If someone cables `nic5`, every guest on `vmbr1` ends up on that wire**,
+  including router copies with one NIC per VLAN. Check `vmbr1`'s guests before
+  plugging anything into that port.
+- It needs a port. On a plain bridge, PVE creates one sub-bridge per VLAN tag
+  on the bridge's physical port (`vmbr1v33` on `nic5.33`). With no port, it
+  refuses a tagged NIC with "no physical interface on bridge". The first
+  version, created on 2026-10-23, was port-less and VLAN-aware for that
+  reason. On 2026-10-27 it was rebuilt on `nic5`, to match the source host.
+- New node: [`blue3-deploy/network/vmbr1.sh`](../blue3-deploy/network/vmbr1.sh).
+  It touches `vmbr1` only (`ifup vmbr1`, never `ifreload -a`), so `vmbr0`, and
+  corosync with it, are never reloaded.
+
+**Pending changes in the UI.** `/etc/network/interfaces.new` holds a network
+change made in the UI that was not applied. While that file exists, *Network*
+shows "Pending changes". *Apply Configuration* then installs that file as a
+whole, and any edit made to `interfaces` in the meantime is lost. *Revert*
+deletes the file. spx1 had one from 2026-09-21 (it only reordered lines) until
+it was reverted on 2026-10-27. Check for it before editing `interfaces` by
+hand.
 
 ## History: the entry-point VMs (removed 2026-09-25)
 

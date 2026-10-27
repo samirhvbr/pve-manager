@@ -122,9 +122,46 @@ network changes (`Sys.Modify`), or user and permission management. Pool
 selection is no longer mandatory for them, because `VM.Allocate` comes from
 `/vms`.
 
-Still root-only, or not granted: uploading ISOs (`Datastore.AllocateTemplate`),
-LXC `keyctl`, device passthrough, and remote migration from another cluster
-(`Sys.Incoming`). With this much reach, **enroll TOTP** for these accounts.
+Still root-only, or not granted: LXC `keyctl`, device passthrough, and
+remote migration from another cluster (`Sys.Incoming`). With this much reach,
+**enroll TOTP** for these accounts.
+
+**Added on 2026-10-21**, for the migration in
+[guest-migration.md](guest-migration.md):
+
+```bash
+pveum acl modify /        --groups vmadmins --roles PVEAuditor          # Datacenter menus
+pveum acl modify /storage --groups vmadmins --roles PVEDatastoreAdmin   # add storages, upload ISOs
+```
+
+Without `Sys.Audit` on `/`, the UI hides *Datacenter → Storage* and most other
+Datacenter panels (`www/manager6/dc/Config.js`). `PVEDatastoreAdmin` lets the
+group add a storage, such as the PBS used for the migration, and upload ISOs
+and templates. It also lets them remove a storage definition. That does not
+delete data, but guests on that storage lose their disks until it is added
+back.
+
+### A deeper ACL replaces the inherited one
+
+PVE takes a user's roles for a path from the **deepest** path that has an ACL
+for that user or for one of their groups. It does not add them to what is
+inherited from above. So a `vmadmins` member who also holds `Administrator`
+on `/` gets **only `PVEAuditor` on every node**, from the group's `/nodes`
+entry. That member has no `Sys.Modify` on the nodes, so they cannot create or
+edit a bridge, even with `Administrator` on `/`. A user ACL on a single node,
+such as `/nodes/b3p1`, does the same thing for that node.
+
+Using a bridge is a separate right: `SDN.Use` on
+`/sdn/zones/localnetwork/<bridge>`, which the group has on every bridge and
+every VLAN tag. Check what someone really has with:
+
+```bash
+pveum user permissions <user>@pve --path /nodes/<node>
+pveum user permissions <user>@pve --path /sdn/zones/localnetwork/vmbr1/<tag>
+```
+
+`pveum user list` without `--full` shows `groups: None` even for group
+members. Use `user permissions` instead.
 
 ## Named admins
 

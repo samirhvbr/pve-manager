@@ -82,7 +82,23 @@ Things to know:
 - Verified on 2026-09-25 on all three nodes. Survival across a reboot has not
   been tested yet: the unit is enabled, but no node has rebooted since.
 
-## 5. Access for people
+## 5. Bridges
+
+Every node has `vmbr0` on its 10G port (the installer creates it, just make
+sure it is called `vmbr0`) and `vmbr1`, the "Telefonia" bridge, on a port
+with **no link**. Why they look like that: [cluster.md](cluster.md),
+*Bridges*.
+
+```bash
+ssh root@<new> bash -s           < blue3-deploy/network/vmbr1.sh   # port nic5
+ssh root@<new> bash -s -- <port> < blue3-deploy/network/vmbr1.sh   # if the spare port has another name
+ssh root@<new> bash -s -- status < blue3-deploy/network/vmbr1.sh
+```
+
+The script refuses a port that has link, a port already in a bridge, and a
+node with pending network changes in the UI. It brings up `vmbr1` only.
+
+## 6. Access for people
 
 Users, pools and ACLs live in `/etc/pve/user.cfg`, which the cluster
 replicates. **Existing accounts work on the new node with no action.**
@@ -96,7 +112,7 @@ What is per node:
   named `vmbr0` on **every** node. Name the new node's guest bridge `vmbr0`
   and existing grants apply. Name it differently and they do not.
 
-## 6. Bookkeeping
+## 7. Bookkeeping
 
 - Add the node to the table in [lab.md](lab.md).
 - Once the hardening runbook is in place, rerun

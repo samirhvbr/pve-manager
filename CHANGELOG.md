@@ -11,6 +11,35 @@ Entrada nova sempre **no topo**. Ver [CLAUDE.md](CLAUDE.md) para a convenção.
 
 ## 9.2.20+blue3.1 — Merge upstream pve-manager 9.2.20 and redeploy the fork
 
+**2026-10-27: guests moving in from a standalone host, and `vmbr1`**
+
+The package is unchanged, so the version stays the same. The changes are
+node configuration and documentation.
+
+- New [`docs/guest-migration.md`](docs/guest-migration.md). It covers the two
+  methods tried for moving guests in from a standalone PVE 7.4 host:
+  `qm remote-migrate` works but refuses snapshots and leaves the source
+  locked, and backup/restore through a PBS is the one used for the bulk. It
+  also covers the VMID rule (+1000 where free, else from 1140), the checks a
+  copy needs before it starts, and the 2026-10-21 freeze of b3p1's storage. In
+  that freeze, three parallel restores left an orphaned `lvcreate` holding the
+  volume group lock, and `dmsetup udevcomplete` released it.
+- **`vmbr1` on both nodes now matches the source host's bridge:** a plain
+  bridge on `nic5` (the 10G card's second port, no link), comment
+  `Telefonia`. It was created on 2026-10-23 as a port-less VLAN-aware bridge.
+  It was rebuilt on 2026-10-27 with `ifdown`/`ifup vmbr1` only, while no guest
+  was attached to it. See [`docs/cluster.md`](docs/cluster.md), *Bridges*.
+- New [`blue3-deploy/network/vmbr1.sh`](blue3-deploy/network/vmbr1.sh)
+  creates it on a new node. It is now step 5 of
+  [`docs/new-node.md`](docs/new-node.md).
+- spx1's stale pending network change, from 2026-09-21, was reverted. It
+  only reordered `interfaces`.
+- [`docs/access.md`](docs/access.md) now has the group's two grants from
+  2026-10-21 (`PVEAuditor` on `/`, `PVEDatastoreAdmin` on `/storage`). It also
+  explains why a deeper ACL, such as the group's `/nodes` entry, overrides
+  `Administrator` on `/`. Because of that, the migration account can use any
+  bridge but cannot create one.
+
 **2026-09-25: spx1 joins the cluster, and the vote rule**
 
 The package is unchanged. Only the cluster changed, and nothing was
