@@ -66,6 +66,10 @@ destination port of connections **addressed to the node itself** to 8006. The
 `blue3-web-redirect.service` unit reloads the table at boot. pveproxy already
 answers plain HTTP with a 301 to HTTPS, so port 80 needs nothing else.
 
+The same script runs unchanged on a Proxmox Backup Server host. It finds
+`proxmox-backup-proxy` instead of `pveproxy` and redirects to 8007, and that
+daemon answers plain HTTP with the same 301.
+
 Why not nginx: a reverse proxy makes every client appear as `127.0.0.1`,
 which is in `ALLOW_FROM`. That would open the step 7 lockdown of the runbook,
 and blind fail2ban. The redirect keeps the real source IP.

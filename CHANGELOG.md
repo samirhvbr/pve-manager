@@ -11,6 +11,18 @@ Entrada nova sempre **no topo**. Ver [CLAUDE.md](CLAUDE.md) para a convenção.
 
 ## 9.2.20+blue3.1 — Merge upstream pve-manager 9.2.20 and redeploy the fork
 
+**2026-11-03: the web redirect also serves the backup server**
+
+The package is unchanged, so the version stays the same.
+
+- [`blue3-deploy/web-redirect/web-redirect.sh`](blue3-deploy/web-redirect/web-redirect.sh)
+  now finds the UI by itself: 8006 when `pveproxy` is installed, 8007 when
+  `proxmox-backup-proxy` is. On a PVE node it writes the same ruleset as
+  before.
+- It is installed on the cluster's new Proxmox Backup Server host. Checked
+  from a workstation: plain HTTP gets a 301 to `https://<host>/`, and 443
+  serves the PBS UI with the same certificate as 8007.
+
 **2026-10-27: guests moving in from a standalone host, and `vmbr1`**
 
 The package is unchanged, so the version stays the same. The changes are

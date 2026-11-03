@@ -101,7 +101,8 @@ fail2ban) — **não entra no build do .deb**. Diretório novo, que o upstream n
 terá, então nunca conflita.
 
 It also holds `web-redirect/web-redirect.sh`, which serves the UI on 80/443 and
-is installed on every node, `cluster/renumber-vms.sh`, which clears VMID
+is installed on every node and on the backup server (8006 for PVE, 8007 for
+PBS, detected by the script), `cluster/renumber-vms.sh`, which clears VMID
 conflicts before a host joins, and `network/vmbr1.sh`, which creates the
 "Telefonia" bridge on a port with no link. A new server follows
 [docs/new-node.md](docs/new-node.md), which lists everything a node needs
