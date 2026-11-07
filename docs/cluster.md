@@ -44,6 +44,31 @@ With two hosts, both must be up for quorum:
 A third physical host (9 votes, quorum 5), or a QDevice on an independent
 machine, lets any single host fail.
 
+## Rebooting a host
+
+Done on both hosts on 2026-11-07 for a kernel update. One host at a time.
+
+- **Autostart follows `onboot`, so set it first.** The rule is: a running guest
+  has `onboot: 1`, a stopped guest has `onboot: 0`, and benchmark VMs have
+  `onboot: 0` whatever their state, because they run only during a test.
+  Before that date, 16 running guests had no `onboot` and would have stayed
+  off, and 7 stopped ones would have started.
+- **A snapshot rollback restores `onboot`.** The benchmark VMs' snapshots were
+  taken with `onboot: 1`, so each rollback by the benchmark driver turns
+  autostart back on. Set `onboot: 0` again right before the reboot, and do
+  not reboot while a benchmark VM is running.
+- **While one host is down, the other is not quorate.** Its guests keep
+  running, but nothing can be started, stopped or changed there. That also
+  breaks any API client working against it, such as the benchmark driver.
+- **After the reboot,** compare guest by guest with the state saved before:
+  the same guests running, the same ones stopped. Pending configuration
+  changes are applied at that boot, and guests come back on the newly
+  installed QEMU.
+- **Guest shutdown:** most VMs have no guest agent. They get an ACPI shutdown,
+  and one that ignores it is stopped hard after the timeout.
+- **Time:** the host was out of the cluster for 14 min on spx1 and 7 min on
+  b3p1, most of it in the Dell POST.
+
 ## Bridges
 
 Both nodes have the same two bridges, with the same names, so a guest's

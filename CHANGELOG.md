@@ -26,8 +26,16 @@ Entrada nova sempre **no topo**. Ver [CLAUDE.md](CLAUDE.md) para a convenção.
 - Only `debian/changelog` conflicted. Branding, the Blue3 links and the
   removed subscription notice merged unchanged. Upstream added no new Proxmox
   strings or `checked_command()` calls under `www/`.
-- It ships together with the 2026-11-07 security updates on both nodes:
-  kernel 7.0.14-28 and QEMU 11.1.3.
+- Installed on both nodes on 2026-11-07, together with that day's security
+  updates (kernel 7.0.14-28, QEMU 11.1.3, corosync 3.2.0), and each node was
+  rebooted after its update. Both came back with the same guests running and the
+  same ones stopped.
+- [docs/upstream-sync.md](docs/upstream-sync.md), step 7: install the fork in
+  the same apt transaction as the packages the hold keeps back. A plain
+  `dpkg -i` left `pve-manager` unconfigured on spx1.
+- [docs/cluster.md](docs/cluster.md): new section *Rebooting a host*, covering
+  the `onboot` rule, snapshot rollbacks restoring `onboot`, and quorum while one
+  host is down.
 
 ## 9.2.20+blue3.1 — Merge upstream pve-manager 9.2.20 and redeploy the fork
 

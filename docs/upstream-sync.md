@@ -123,12 +123,28 @@ subdirectory and writes to its parent.
 
 ### 7. Install on each node, one at a time
 
+Install the fork in the **same apt transaction** as the packages the hold kept
+back. With the old fork on hold, `apt full-upgrade` keeps back every package
+whose new version `Breaks` the old `pve-manager`. In the 9.2.26 sync these were
+9 packages, among them `pve-container` (`Breaks: pve-manager (<< 9.2.22)`) and
+`libpve-rs-perl` (`<< 9.2.26`). The new fork depends on some of them. A plain
+`dpkg -i` then leaves `pve-manager` unpacked but not configured, which happened
+on spx1 on 2026-11-07.
+
 ```bash
-dpkg -i pve-manager_X+blue3.1_all.deb
+apt full-upgrade                                  # pve-manager stays on hold
+kept=$(apt list --upgradable 2>/dev/null | grep upgradable | cut -d/ -f1 | grep -vx pve-manager)
+apt-mark unhold pve-manager
+apt-get -s install ./pve-manager_X+blue3.1_all.deb $kept   # no "Remv", ends with "Conf pve-manager (X+blue3.1"
+apt-get install ./pve-manager_X+blue3.1_all.deb $kept
 apt-mark hold pve-manager
+dpkg-query -W -f='${db:Status-Abbrev}\n' pve-manager     # "hi": held and installed
 pveversion                          # pve-manager/X+blue3.1/<fork-commit>
 curl -sk https://127.0.0.1:8006/ | grep -o '<title>[^<]*'   # "<node> - Blue3 Cloud"
 ```
+
+If a node was already left with `pve-manager` unpacked (`hU`), run the same
+`apt-get install` with the kept-back packages alone: it configures the fork.
 
 The postinst reloads (or restarts) `pvedaemon`, `pvestatd`, `pveproxy`,
 `spiceproxy` and `pvescheduler`. Guests keep running. Open UI sessions may have
