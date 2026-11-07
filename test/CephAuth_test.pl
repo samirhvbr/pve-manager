@@ -11,6 +11,34 @@ use Storable qw(dclone);
 use PVE::Ceph::Services;
 use PVE::CLI::pveceph;
 
+my $members = { map { $_ => 1 } qw(node1 node2 node1.exact) };
+for my $test (
+    ['node1', 'node1', 'exact member'],
+    ['node1.exact', 'node1.exact', 'exact membership precedes first-label mapping'],
+    ['node1.example.com', 'node1', 'member FQDN'],
+    ['node2.example.com', 'node2', 'local member FQDN'],
+    ['foreign.example.com', 'foreign.example.com', 'foreign FQDN'],
+    ['foreign', 'foreign', 'foreign short name'],
+    ['node1.foreign.invalid', 'node1', 'same-label foreign domain is a known ambiguity'],
+    ['.example.com', '.example.com', 'empty first label is not a member'],
+    ['', '', 'empty input remains for caller validation'],
+    [undef, undef, 'undefined input remains for caller validation'],
+) {
+    my ($host, $expected, $name) = @$test;
+    is(PVE::Ceph::Services::metadata_host_node($host, $members), $expected, $name);
+}
+my $invalid_host = {};
+is(
+    PVE::Ceph::Services::metadata_host_node($invalid_host, $members),
+    $invalid_host,
+    'reference input remains for caller validation, not transport',
+);
+is(
+    PVE::Ceph::Services::metadata_host_node('node1.example.com', { node1 => 1 }),
+    'node1',
+    'single-node membership also maps an FQDN',
+);
+
 # The cipher landed mid-release, so $AES256K_MIN_CEPH_RELEASE has to answer per major and
 # not just compare against one minimum. Both the full 'ceph versions' string and the bare
 # 'ceph_version_short' of the daemon metadata reach ceph_version_supports_aes256k(), which
@@ -164,8 +192,8 @@ like($current_text, qr/not guests, mounts, or sessions/, 'counts are not workloa
 like($current_text, qr/none active/, 'a successful empty health read says none active');
 unlike(
     $current_text,
-    qr/--rotate-|--restrict|migration complete|consumers (?:are )?refreshed/,
-    'current keys do not imply further rotations, restriction safety, or refreshed consumers',
+    qr/--rotate-|--restrict|migration complete|clients (?:are )?refreshed/,
+    'current keys do not imply further rotations, restriction safety, or refreshed clients',
 );
 like($current_text, qr/^  \Q$helper\E$/m, 'the all-current helper readiness command is standalone');
 like(
@@ -226,8 +254,8 @@ is(
 );
 like(
     $fresh_text,
-    qr/Consumer refresh, including disconnected consumers and external copies, is not verified here/,
-    'grouped old keys retain consumer and saved-copy limits',
+    qr/Client refresh, including disconnected clients and external copies, is not verified here/,
+    'grouped old keys retain client and saved-copy limits',
 );
 
 my $mixed_replies = dclone($fresh_replies);

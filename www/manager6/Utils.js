@@ -1635,6 +1635,10 @@ Ext.define('PVE.Utils', {
                 menu = Ext.create('PVE.dc.TagCmdMenu', {
                     tag: record.data.tag,
                 });
+            } else if (type === 'pool') {
+                menu = Ext.create('PVE.dc.PoolCmdMenu', {
+                    pool: record.data.pool,
+                });
             } else if (record?.isRoot()) {
                 menu = Ext.create('PVE.dc.CmdMenu', {
                     pveSelNode: record,
@@ -2277,5 +2281,7 @@ Ext.define('PVE.Utils', {
             replication: gettext('Replication job notifications'),
             fencing: gettext('Node fencing notifications'),
         });
+
+        Proxmox.Schema.notificationMatcherExpressions = true;
     },
 });

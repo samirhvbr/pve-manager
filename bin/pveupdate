@@ -83,7 +83,9 @@ eval {
     if ($acme_node_config && $acme_node_config->{domains}) {
         my $cert = PVE::CertHelpers::cert_path_prefix($nodename) . ".pem";
         if (-e $cert) {
-            if (PVE::Certificate::check_expiry($cert, time() + 30 * 24 * 60 * 60)) {
+            my $lead_time = PVE::Certificate::get_cert_renew_lead_time($cert);
+
+            if (PVE::Certificate::check_expiry($cert, time() + $lead_time)) {
                 PVE::API2::ACME->renew_certificate({ node => $nodename });
             } else {
                 syslog(
@@ -101,13 +103,14 @@ eval {
 };
 syslog('err', "Renewing ACME certificate failed: $@") if $@;
 
+eval { PVE::Cluster::Setup::renew_pveca_cert() };
+syslog('err', "Renewing cluster CA certificate failed: $@") if $@;
+
 eval {
     my $certpath = PVE::CertHelpers::default_cert_path_prefix($nodename) . ".pem";
     my $capath = "/etc/pve/pve-root-ca.pem";
 
-    my $renew = sub {
-        my ($msg) = @_;
-
+    my $check_issued_by_ca = sub {
         # get CA info
         my $cainfo = PVE::Certificate::get_certificate_info($capath);
 
@@ -123,17 +126,31 @@ eval {
             '/usr/bin/openssl', 'verify', '-no_check_time', '-CAfile', $capath, '--', $certpath,
         ];
         PVE::Tools::run_command($cmd);
+    };
+
+    my $renew = sub {
+        my ($msg, $replaced_ca) = @_;
+
+        # one from a replaced cluster CA fails these checks, but is still ours to replace
+        $check_issued_by_ca->() if !$replaced_ca;
 
         print "PVE certificate $msg\n";
         # create new certificate
         my $ip = PVE::Cluster::remote_node_ip($nodename);
         PVE::Cluster::Setup::gen_pve_ssl_cert(1, $nodename, $ip);
+        my $expiry = localtime(PVE::Certificate::get_expiration_as_epoch($certpath));
+        print "Renewed PVE certificate is valid until $expiry\n";
 
         print "Restarting pveproxy after renewing certificate\n";
         PVE::Tools::run_command(['systemctl', 'reload-or-restart', 'pveproxy']);
     };
 
-    if (PVE::Certificate::check_expiry($certpath)) {
+    my $status = eval { PVE::Cluster::Setup::pve_ssl_cert_status($nodename) };
+    syslog('err', "Checking SSL certificate failed: $@") if $@;
+
+    if ($status && $status->{'issued-by'} eq 'replaced-ca') {
+        $renew->("was issued by a replaced cluster CA, renewing...", 1);
+    } elsif (PVE::Certificate::check_expiry($certpath)) {
         # already expired
         $renew->("expired, renewing...");
     } elsif (PVE::Certificate::check_expiry($certpath, time() + 14 * 24 * 60 * 60)) {

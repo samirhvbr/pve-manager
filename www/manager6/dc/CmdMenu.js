@@ -116,12 +116,32 @@ Ext.define('PVE.dc.TagCmdMenu', {
         }
 
         me.title = `${gettext('Tag')} '${me.tag}'`;
-        if (PVE.ClusterName?.length) {
-            me.title += ` (${me.nodename})`;
-        }
 
         me.extraHandlerArgs = {
             prefilterIncludeTag: me.tag,
+        };
+
+        me.callParent();
+    },
+});
+
+Ext.define('PVE.dc.PoolCmdMenu', {
+    extend: 'PVE.dc.CmdMenu',
+    xtype: 'poolCmdMenu',
+
+    minWidth: 220,
+
+    initComponent: function () {
+        let me = this;
+
+        if (!me.pool) {
+            throw 'no pool specified';
+        }
+
+        me.title = `${gettext('Pool')} '${me.pool}'`;
+
+        me.extraHandlerArgs = {
+            prefilterPool: me.pool,
         };
 
         me.callParent();

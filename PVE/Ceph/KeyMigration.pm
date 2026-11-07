@@ -7,7 +7,7 @@ use v5.36;
 
 use Digest::SHA qw(sha256_hex);
 use JSON;
-use MIME::Base64 qw(decode_base64);
+use MIME::Base64 qw(decode_base64 encode_base64);
 
 use PVE::Ceph::Services;
 use PVE::Tools ();
@@ -19,6 +19,8 @@ our @EXPORT_OK = qw(
     $CIPHER $LEGACY_CIPHER $CIPHER_ID $CIPHER_NAMES $CIPHER_IDS
     $DAEMON_TYPES $TOOL_CLIENT_KEYS $ADMIN_ENTITY $GRACE_OPTION
     key_cipher key_fingerprint keyring_text short_version version_has_cipher
+    parse_storage_key storage_config_problem storage_key_copy_problems storage_key_copy_warnings
+    parse_auth_methods summarize_monitor_authentication
     parse_probe_output osd_label_identity needs_rotation mon_key_needs_rotation mon_keyring_stale
     mon_key_rotation_wanted client_keys_requested migration_unfinished unfinished_entities
     bulk_storage_staging_needed client_staging_needed touched_daemons
@@ -61,6 +63,36 @@ our $ADMIN_ENTITY = 'client.admin';
 # is disabled; older ones promote a pending key on its first use.
 our $GRACE_OPTION = 'mon_auth_client_pending_key_auto_promote';
 
+sub parse_auth_methods($value) {
+    return undef if !defined($value) || ref($value);
+    my @methods = grep { length } split(/[;,= \t]+/, $value);
+    @methods = ('cephx') if !@methods;
+    return undef if grep { !m/^(?:none|cephx|gss)$/ } @methods;
+    return { map { $_ => 1 } @methods };
+}
+
+# These are configured values, not the monitor's initialized authentication lists. A runtime
+# change without a restart can make the two differ, so they must not authorize skipping keys.
+sub summarize_monitor_authentication($monitors, $reports) {
+    my @unknown;
+    my $clients = 1;
+    for my $mon (@$monitors) {
+        my $report = $reports->{$mon} // {};
+        my $service = parse_auth_methods($report->{auth_service_required});
+        if (!defined($service)) {
+            push @unknown, $mon;
+        } elsif (!$service->{cephx}) {
+            $clients = 0;
+        }
+    }
+    push @unknown, 'unknown' if !@$monitors;
+    return {
+        monitors => $reports,
+        unknown => \@unknown,
+        client_cephx_available => @unknown ? undef : $clients,
+    };
+}
+
 sub key_cipher($key) {
     return undef if !defined($key) || $key eq '';
 
@@ -88,6 +120,130 @@ sub keyring_text($entry) {
     }
 
     return $text;
+}
+
+sub valid_storage_key($key) {
+    return 0 if !defined($key) || ref($key) || $key !~ m{\A[A-Za-z0-9+/]+={0,2}\z};
+    my $raw = decode_base64($key);
+    return 0 if length($raw) < 12 || encode_base64($raw, '') ne $key;
+    my ($type, $length) = (unpack('v', $raw), unpack('v', substr($raw, 10, 2)));
+    return 0 if length($raw) != 12 + $length;
+    return
+        ($type == 0 && $length == 0)
+        || ($type == 1 && $length >= 16)
+        || ($type == 2 && $length == 32);
+}
+
+# Inspect the configured identity, not any matching substring or another section's credential.
+# Errors describe structure only: malformed lines can themselves contain secret material.
+sub parse_storage_key($content, $format, $entity) {
+    my $invalid = { error => 'malformed or ambiguous key file' };
+    return $invalid if !defined($content) || ref($content);
+    if ($format eq 'secret') {
+        $content =~ s/\A\s+|\s+\z//g;
+        return valid_storage_key($content) ? { key => $content } : $invalid;
+    }
+    return $invalid if $format ne 'keyring';
+
+    my ($section, $seen, $key);
+    for my $line (split(/\n/, $content)) {
+        $line =~ s/^\s+|\s+$//g;
+        next if $line eq '' || $line =~ m/^[#;]/;
+        if ($line =~ m/^\[([^\[\]]+)\]\s*(?:[#;].*)?$/) {
+            $section = $1;
+            return $invalid if $section eq $entity && $seen++;
+            next;
+        }
+        next if !defined($section) || $section ne $entity || $line !~ m/^key\s*=/;
+        return $invalid
+            if defined($key)
+            || $line !~ m/^key\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s#;]+))\s*(?:[#;].*)?$/;
+        $key = $1 // $2 // $3;
+        return $invalid if !valid_storage_key($key);
+    }
+    return { error => 'no key for the configured Ceph user' } if !defined($key);
+    return { key => $key };
+}
+
+# Custom configurations can redirect clients away from the standard file. Do not follow those
+# paths or create configuration files during a read-only retirement check.
+sub storage_config_problem($content, $path, $entity = 'client.admin', $cluster = 'ceph') {
+    my ($type, $id) = split(/\./, $entity, 2);
+    my $variables = { cluster => $cluster, name => $entity, type => $type, id => $id };
+    my ($section, %sections, %options, $keyring);
+    for my $line (split(/\n/, $content)) {
+        $line =~ s/^\s+|\s+$//g;
+        next if $line eq '' || $line =~ m/^[#;]/;
+        if ($line =~ m/^\[([^\[\]]+)\]\s*(?:[#;].*)?$/) {
+            $section = $1;
+            return 'duplicate section in custom configuration' if $sections{$section}++;
+            next;
+        }
+        return 'unverified custom configuration'
+            if !defined($section) || $line !~ m/^([\w -]+?)\s*=\s*(.*?)\s*$/;
+        my ($option, $value) = ($1, $2);
+        $option =~ s/ /_/g;
+        return 'duplicate option in custom configuration' if $options{"$section:$option"}++;
+        $value =~ s/\s*[#;].*$// if $value !~ m/^["']/;
+        $value =~ s/^(?:"([^"]*)"|'([^']*)')\s*(?:[#;].*)?$/$1 \/\/ $2/e;
+        $value =~
+            s/\$\{(cluster|name|id|type)\}|\$(cluster|name|id|type)\b/$variables->{$1 \/\/ $2}/ge;
+        $keyring = 1 if $option eq 'keyring';
+        return 'alternate credentials in custom configuration'
+            if $option =~ m/^(?:key|keyfile|secretfile|name|id|include)$/
+            || ($option eq 'keyring' && $value ne $path);
+    }
+    return 'no verified keyring path in custom configuration'
+        if $path =~ m/\.keyring$/ && !$keyring;
+    return undef;
+}
+
+sub storage_key_copy_problems($copies, $entity, $retiring, $target, $reverse = 0) {
+    my (@problems, @stale);
+    my $replacement = $reverse ? 'the restored key' : 'the staged key';
+    for my $copy (@$copies) {
+        my $where = "storage '$copy->{store}' in '$copy->{path}'";
+        my $own_user = $entity =~ m/^client\.(?!osd-lockbox\.)/ && $copy->{entity} eq $entity;
+        my $managed = $copy->{managed} && $own_user;
+        if (defined($retiring) && $retiring ne $target && ($copy->{key} // '') eq $retiring) {
+            push @stale, $copy;
+        } elsif ($copy->{error} && $managed) {
+            push @problems, "Cannot retire the key of '$entity': $where is unverified"
+                . " ($copy->{error}). Verify its configured user's credentials, then retry.";
+        } elsif ($managed && ($copy->{key} // '') ne $target) {
+            push @problems,
+                "Cannot retire the key of '$entity': managed $where does not hold"
+                . " $replacement of the same Ceph user. Update this copy, refresh its clients,"
+                . " then retry.";
+        }
+    }
+    unshift @problems,
+        join(
+            "\n",
+            "Cannot retire the key of '$entity': these storage key copies still hold it:",
+            (map { "  $_->{store}: $_->{path}" } @stale),
+            "Update each with $replacement of the same Ceph user and refresh its clients, then"
+            . " retry. If one is configured for another cluster or Ceph user, first confirm"
+            . " that it really shares this key.",
+        ) if @stale;
+    return \@problems;
+}
+
+sub storage_key_copy_warnings($copies, $entity = undef, $reverse = 0) {
+    my $replacement = $reverse ? 'the restored key' : 'the staged key';
+    my @unchecked = grep {
+        !$_->{managed} && $_->{error} && (!defined($entity) || $_->{entity} eq $entity)
+    } @$copies;
+    return [] if !@unchecked;
+    return [
+        join(
+            "\n",
+            "These storage key copies could not be checked:",
+            (map { "  $_->{store}: $_->{path} ($_->{error})" } @unchecked),
+            "If one points at this cluster, update it with $replacement of the same Ceph user"
+                . " before confirming.",
+        ),
+    ];
 }
 
 # parse_ceph_version() insists on the commit hash, which a bare or dev version lacks
@@ -244,7 +400,7 @@ sub migration_unfinished($state, $entity) {
 # Rotated but not written everywhere. An OSD left stopped stays in 'osd metadata', so the recovery
 # walk alone misses some. A lockbox key with a journal entry is finished from that journal before
 # any plan is built, so it is not listed as something the plan has to pick up. A staged client key
-# is open on purpose until its consumers are confirmed, and reported through its own record.
+# is open on purpose until its clients are confirmed, and reported through its own record.
 sub unfinished_entities($state) {
     my $started = {
         %{ $state->{rotated} // {} },
@@ -405,6 +561,8 @@ sub summarize_sessions($per_mon, $expected_mons = undef) {
                 next;
             }
             next if $session->{con_type} ne 'client';
+            # skip the monitors' own key, which a 'ceph tell' sent as 'mon.' also shows up as
+            next if ($session->{entity_name} // '') eq 'mon.';
 
             my $gid = $session->{global_id};
             my $entity = $session->{entity_name};
@@ -455,7 +613,7 @@ sub session_hosts($live) {
     return join(', ', map { "$_: $hosts->{$_}" } sort keys %$hosts);
 }
 
-# The same with node names and host-wide consumer hints when known. A hint describes every
+# The same with node names and host-wide client hints when known. A hint describes every
 # monitor connection on that node, not the particular cephx session being reported.
 sub describe_sessions($live, $hints = {}) {
     my ($hosts, $possible) = ({}, {});
@@ -472,7 +630,7 @@ sub describe_sessions($live, $hints = {}) {
         map {
             my $line = "$_: $hosts->{$_}";
             my @possible = sort keys %{ $possible->{$_} // {} };
-            $line .= " (possible consumers: " . join('; ', @possible) . ")"
+            $line .= " (possible clients: " . join('; ', @possible) . ")"
                 if scalar(@possible);
             $line;
         } sort keys %$hosts,
@@ -583,7 +741,7 @@ sub merge_refresh_record(
 
 # A recorded ID names the same client instance across reconnects and monitor restarts. Numeric
 # order says nothing because monitors allocate IDs in independent rank-strided sequences.
-# The key each entity's consumers should be on, by fingerprint: the pending key while one is
+# The key each entity's clients should be on, by fingerprint: the pending key while one is
 # staged, the active key otherwise. A session a monitor names by its key fingerprint is judged
 # against that; one without the fingerprint falls back to the IDs recorded around the rotation.
 sub session_key_targets($exported) {
@@ -662,7 +820,7 @@ sub session_key_support_hint() {
     return
         "Session-key identification requires Ceph 19.2.6-pve4, 20.2.4-pve4, or newer"
         . " and a restart of each monitor. Upgrade older monitors, or disconnect this user's"
-        . " consumers before confirming.";
+        . " clients before confirming.";
 }
 
 sub mount_refresh_hint($state, $entity, $files = []) {
@@ -684,7 +842,7 @@ sub mount_refresh_hint($state, $entity, $files = []) {
 }
 
 # The CephFS storages whose mount reads a rotated key. The kernel holds the key a mount was
-# made with and cannot take a new one, so such a mount is a consumer of its own.
+# made with and cannot take a new one, so such a mount is a client of its own.
 sub cephfs_mount_storages($item) {
     my $stores = {};
     for my $file ($item->{files}->@*) {
@@ -757,7 +915,7 @@ sub finish_after_acks($info, $state, $ready) {
 
 # What a requested confirmation can do, from the records and the session picture alone. Only
 # 'accept' closes a record; everything else names what stands in the way, and 'measure' first
-# turns the clients visible right now into named consumers.
+# turns the clients visible right now into named clients.
 sub ack_decision($entity, $state, $sessions, $stale) {
     my $mark = ($state->{client_refresh} // {})->{$entity};
     return { verdict => 'unknown' } if !$mark;
@@ -779,14 +937,19 @@ sub ack_decision($entity, $state, $sessions, $stale) {
     return { verdict => 'accept' };
 }
 
-# what must be resolved before the old cipher can be disallowed without stopping a consumer
+# what must be resolved before the old cipher can be disallowed without stopping a client
 sub restrict_blockers($info, $state, $describe = undef, $files = {}) {
     $describe //= \&session_hosts;
     my $blockers = [];
     my $sessions = $info->{sessions} // {};
-    push @$blockers,
-        "not every monitor answered the session query, so live consumers cannot be verified"
-        if !$sessions->{complete};
+    if (!$sessions->{complete}) {
+        my $errors = $sessions->{errors} // {};
+        my $detail = join('; ', map { "$_: $errors->{$_}" } sort keys %$errors);
+        $detail ||= join(', ', @{ $sessions->{unanswered} // [] });
+        push @$blockers,
+            "not every monitor answered the session query, so live clients cannot be verified"
+            . (length($detail) ? " ($detail)" : '');
+    }
     push @$blockers,
         "the service tickets still use the '" . ($info->{service_cipher} // 'unknown') . "' cipher"
         if ($info->{service_cipher} // '') ne $CIPHER;
@@ -808,10 +971,12 @@ sub restrict_blockers($info, $state, $describe = undef, $files = {}) {
             $info->{exported},
             $files,
             $describe,
+            $info->{lockbox_status} // $info->{lockbox} // {},
+            $info->{storage_copy_problems} // {},
         );
         return $readiness->{waiting_details}->{$entity}
-            // "consumer refresh awaits your confirmation with '--confirm-clients-refreshed"
-            . " $entity --apply'. Confirm only after refreshing every consumer, including"
+            // "client refresh awaits your confirmation with '--confirm-clients-refreshed"
+            . " $entity --apply'. Confirm only after refreshing every client, including"
             . " disconnected ones and external key copies.";
     };
 
@@ -831,6 +996,13 @@ sub restrict_blockers($info, $state, $describe = undef, $files = {}) {
         if ($old_active && $staged_open->{$entity} && $record && !defined($record->{cleared})) {
             $covered->{$entity} = 1;
             push @$blockers, "'$entity': " . $refresh_detail->($entity);
+            next;
+        }
+        if ((($info->{lockbox_status} // $info->{lockbox} // {})->{$entity} // {})->{orphaned}) {
+            push @$blockers,
+                "'$entity' has no OSD in the current map and still uses another cipher;"
+                . " '--rotate-lockbox-keys' leaves it unchanged. Run without options for"
+                . " verification and removal advice";
             next;
         }
         push @old_keys, "$entity (active)" if $old_active;
@@ -893,19 +1065,19 @@ sub restrict_blockers($info, $state, $describe = undef, $files = {}) {
             push @open_tools, $entity;
             next;
         }
-        # a consumer can keep its IO on established connections without any monitor session,
+        # a client can keep its IO on established connections without any monitor session,
         # so its absence from the sweep proves nothing; only the operator closes a record
         push @$blockers, "'$entity': " . $refresh_detail->($entity);
     }
     if (scalar(@open_tools) == 1) {
         push @$blockers,
             "the rotation of the tool key '$open_tools[0]' awaits '--confirm-clients-refreshed"
-            . " $open_tools[0]'; only Ceph's own tools read it, so it needs no consumer refresh";
+            . " $open_tools[0]'; only Ceph's own tools read it, so it needs no client refresh";
     } elsif (scalar(@open_tools)) {
         push @$blockers,
             "the rotations of "
             . scalar(@open_tools)
-            . " bootstrap and crash keys await their confirmation, which needs no consumer"
+            . " bootstrap and crash keys await their confirmation, which needs no client"
             . " refresh; '--confirm-all-clients-refreshed' closes them once every open record is"
             . " ready, or '--confirm-clients-refreshed USER' each";
     }
@@ -931,15 +1103,16 @@ sub merge_configured_daemons($daemons, $type, $configured, $existing = undef) {
             push @$ghosts, { type => $type, id => "$id", node => $configured->{$id} };
             next;
         }
-        push @$daemons,
-            {
-                type => $type,
-                id => "$id",
-                entity => $type eq 'mon' ? 'mon.' : "$type.$id",
-                node => $configured->{$id},
-                down => 1,
-                $type eq 'osd' && $existing ? ('osd-uuid' => $existing->{$id}) : (),
-            };
+        push @$daemons, {
+            type => $type,
+            id => "$id",
+            entity => $type eq 'mon' ? 'mon.' : "$type.$id",
+            node => $configured->{$id},
+            # pvestatd only reports daemons on nodes of this cluster
+            managed => 1,
+            down => 1,
+            $type eq 'osd' && $existing ? ('osd-uuid' => $existing->{$id}) : (),
+        };
     }
 
     return wantarray ? ($daemons, $ghosts) : $daemons;
@@ -982,13 +1155,17 @@ sub touched_daemons($info, $plan) {
 # so rotating the auth entry just breaks that OSD's next activation.
 # Health can lag both key creation and retirement. A complete export is authoritative, including
 # entries absent from the health details and entries removed since the last health update.
-sub classify_insecure_clients($checks, $storage_entities = {}, $exported = undef) {
+sub classify_insecure_clients($checks, $storage_entities = {}, $exported = undef, $lockbox = {}) {
     my $found = {};
     if (ref($exported) eq 'HASH') {
         for my $entity (grep { m/^client\./ } keys %$exported) {
             my $entry = $exported->{$entity};
             next if ref($entry) ne 'HASH' || !defined($entry->{key});
-            $found->{$entity} = 1 if (key_cipher($entry->{key}) // -1) != $CIPHER_ID;
+            $found->{$entity} = 1
+                if (key_cipher($entry->{key}) // -1) != $CIPHER_ID
+                || (($lockbox->{$entity} // {})->{orphaned}
+                    && length($entry->{pending_key} // '')
+                    && (key_cipher($entry->{pending_key}) // -1) != $CIPHER_ID);
         }
     } else {
         my $check = $checks->{AUTH_INSECURE_CLIENT_KEY_TYPE};
@@ -998,10 +1175,19 @@ sub classify_insecure_clients($checks, $storage_entities = {}, $exported = undef
         }
     }
 
-    my $res = { lockbox => [], tool => [], admin => [], storage => [], other => [] };
+    my $res = {
+        lockbox => [],
+        orphaned_lockbox => [],
+        tool => [],
+        admin => [],
+        storage => [],
+        other => [],
+    };
     for my $entity (sort keys %$found) {
         my $bucket =
-            $entity =~ m/^client\.osd-lockbox\./ ? 'lockbox'
+            $entity =~ m/^client\.osd-lockbox\./
+            && ($lockbox->{$entity} // {})->{orphaned} ? 'orphaned_lockbox'
+            : $entity =~ m/^client\.osd-lockbox\./ ? 'lockbox'
             : $entity eq $ADMIN_ENTITY ? 'admin'
             : (grep { $_ eq $entity } $TOOL_CLIENT_KEYS->@*) ? 'tool'
             : $storage_entities->{$entity} ? 'storage'
@@ -1023,8 +1209,10 @@ sub open_options(
     $exported = undef,
     $files = {},
     $describe = \&session_hosts,
+    $lockbox = {},
+    $storage_problems = {},
 ) {
-    my $clients = classify_insecure_clients($checks, $storage_entities, $exported);
+    my $clients = classify_insecure_clients($checks, $storage_entities, $exported, $lockbox);
     my $done = $opts->{'rotate-storage-key'} // [];
     # a key staged with every copy written is still on the old cipher, but its next step is the
     # confirmation, not the rotation option again
@@ -1113,7 +1301,15 @@ sub open_options(
         my $unwritten = $staged && (!$staged->{written} || $mounts);
         my $unresolved_key = $staged && $key_state !~ m/^(?:waiting|committed)$/;
 
-        if (!$cleared && $verdict eq 'accept' && !$unwritten && !$aborting && !$unresolved_key) {
+        my $copy_problems = $storage_problems->{$entity} // [];
+        if (
+            !$cleared
+            && $verdict eq 'accept'
+            && !$unwritten
+            && !$aborting
+            && !$unresolved_key
+            && !scalar(@$copy_problems)
+        ) {
             push @ready, $entity;
             $all_ready_for_aggregate = 0
                 if $records->{$entity}->{measurement_incomplete}
@@ -1123,7 +1319,9 @@ sub open_options(
             $all_ready_for_aggregate = 0;
 
             my $both = $key_state eq 'waiting' ? ' Both keys remain valid.' : '';
-            if ($key_state eq 'unknown') {
+            if (scalar(@$copy_problems)) {
+                $waiting_details->{$entity} = join(' ', @$copy_problems);
+            } elsif ($key_state eq 'unknown') {
                 $waiting_details->{$entity} =
                     "the staged key cannot be matched to the current auth database."
                     . " Resolve its recorded state before confirming.";
@@ -1172,7 +1370,7 @@ sub open_options(
                         "rollback is prepared.$both "
                         . join('; ', @problems) . ' ('
                         . $describe->(\@held) . ').';
-                    $detail .= ' Refresh consumers using another key to the restored key.'
+                    $detail .= ' Refresh clients using another key to the restored key.'
                         if $reverse->{pending}->@* || $reverse->{other}->@*;
                     $detail .= ' ' . session_key_support_hint() if $reverse->{unknown}->@*;
                 } else {
@@ -1182,7 +1380,7 @@ sub open_options(
                             ? 'All visible sessions use the restored key.'
                             : 'No session is currently visible.'
                         )
-                        . " After refreshing disconnected consumers and external copies, use"
+                        . " After refreshing disconnected clients and external copies, use"
                         . " '--confirm-abort-clients-refreshed $entity --apply'.";
                 }
                 $waiting_details->{$entity} = $detail;
@@ -1199,7 +1397,7 @@ sub open_options(
                     length($which)
                     ? "Monitors that did not answer: $which."
                     : "Not every monitor answered.";
-                $waiting_details->{$entity} = "consumer verification is incomplete. $reason$both"
+                $waiting_details->{$entity} = "client verification is incomplete. $reason$both"
                     . " Retry after every monitor answers.";
             } elsif ($verdict eq 'unidentified') {
                 $waiting_sessions->{$entity} = $decision->{held};
@@ -1209,8 +1407,8 @@ sub open_options(
                     . session_key_support_hint();
             } elsif ($verdict eq 'measure') {
                 $waiting_details->{$entity} =
-                    "the first complete consumer measurement is"
-                    . " pending.$both After refreshing every consumer, run"
+                    "the first complete client measurement is"
+                    . " pending.$both After refreshing every client, run"
                     . " '--confirm-clients-refreshed $entity --apply'; the first attempt records"
                     . " the measurement without committing the key.";
             } elsif ($verdict eq 'connected') {
@@ -1224,10 +1422,10 @@ sub open_options(
                 $waiting_details->{$entity} =
                     "$count session(s) $why ("
                     . $describe->($held)
-                    . ").$both Refresh these consumers, then rerun without options.";
+                    . ").$both Refresh these clients, then rerun without options.";
             } else {
-                $waiting_details->{$entity} = "consumer refresh is not confirmed.$both Refresh"
-                    . " every consumer, then rerun without options.";
+                $waiting_details->{$entity} = "client refresh is not confirmed.$both Refresh"
+                    . " every client, then rerun without options.";
             }
         }
     }
@@ -1250,7 +1448,7 @@ sub open_options(
 
     # The cluster-owned keys can be rotated together without a client decision. The aggregate
     # option also safely selects categories that are already done. Keep client.admin, Ceph storage
-    # users, and the ticket wipe out; their consumers can sit outside this cluster.
+    # users, and the ticket wipe out; their clients can sit outside this cluster.
     my $cluster_keys = grep {
         my $entry = $_;
         grep { $entry =~ m/^\Q$_\E[: ]/ }
@@ -1269,7 +1467,8 @@ sub open_options(
         waiting_sessions => $waiting_sessions,
         ready => \@ready,
         all_ready_for_aggregate => $all_ready_for_aggregate,
-        stuck => [$clients->{other}->@*], # a lockbox key has an option, so it is not stuck
+        stuck => [$clients->{other}->@*],
+        orphaned_lockbox => $clients->{orphaned_lockbox},
         lockbox => $lockbox_open,
         storage_bulk => $storage_bulk,
         storage_scope => \@storage_open,
@@ -1295,6 +1494,8 @@ sub open_actions(
         $info ? $info->{exported} : undef,
         ($info // {})->{client_files} // {},
         $describe,
+        ($info // {})->{lockbox_status} // ($info // {})->{lockbox} // {},
+        ($info // {})->{storage_copy_problems} // {},
     );
     my $allowed = $info ? $info->{allowed_ciphers} : undef;
     my $preferred = $info ? $info->{preferred_cipher} : undef;
@@ -1312,7 +1513,7 @@ sub open_actions(
     if ($finish && !scalar($open->{ready}->@*) && !scalar($open->{next}->@*)) {
         push $open->{next}->@*,
             "--restrict-ciphers: allow only the '$CIPHER' cipher for authentication, once every"
-            . " running consumer holds its rotated key";
+            . " running client holds its rotated key";
         push $open->{together}->@*, '--restrict-ciphers';
     }
 
@@ -1330,7 +1531,7 @@ sub open_actions(
     }
 
     # A missing next action is not completion: current auth, settings, and recovery state must
-    # agree, and no invisible-consumer confirmation may still be outstanding.
+    # agree, and no invisible-client confirmation may still be outstanding.
     my @unfinished = unfinished_entities($state);
     my $visible = ($info // {})->{sessions}->{clients} // {};
     my @unmatched = grep {
@@ -1426,7 +1627,7 @@ sub plan_client_keys($info, $state, $opts, $files) {
             next;
         }
         # a key staged by an earlier run with every copy written stays open on purpose until its
-        # consumers are confirmed; one whose copies are not all written is planned again, and the
+        # clients are confirmed; one whose copies are not all written is planned again, and the
         # staging reuses the pending key rather than staging a second one over it. An aborting key
         # only follows the explicit rollback path.
         my $existing = $state->{staged}->{$entity};

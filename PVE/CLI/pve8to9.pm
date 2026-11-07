@@ -21,6 +21,7 @@ use PVE::Jobs;
 use PVE::JSONSchema;
 use PVE::Network;
 use PVE::NodeConfig;
+use PVE::ProcFSTools;
 use PVE::RPCEnvironment;
 use PVE::Storage;
 use PVE::Storage::Plugin;
@@ -967,7 +968,7 @@ my sub check_qemu_machine_versions {
         my $conf = PVE::QemuConfig->load_config($vmid);
 
         # first, actually configured machine version
-        my $machine_type = PVE::QemuServer::Machine::get_vm_machine($conf, undef, $conf->{arch});
+        my $machine_type = PVE::QemuServer::Machine::get_vm_machine($conf);
         if (
             PVE::QemuServer::Machine::extract_version($machine_type) # no version means latest
             && !PVE::QemuServer::Machine::is_machine_version_at_least($machine_type, @baseline)
@@ -978,9 +979,7 @@ my sub check_qemu_machine_versions {
         # second, if hibernated, running machine version
         if ($conf->{vmstate}) {
             my $machine_type = PVE::QemuServer::Machine::get_vm_machine(
-                $conf,
-                $conf->{runningmachine},
-                $conf->{arch},
+                $conf, $conf->{runningmachine},
             );
             if (
                 PVE::QemuServer::Machine::extract_version($machine_type) # no version means latest
@@ -1000,7 +999,6 @@ my sub check_qemu_machine_versions {
                 my $machine_type = PVE::QemuServer::Machine::get_vm_machine(
                     $snap_conf,
                     $snap_conf->{runningmachine},
-                    $snap_conf->{arch},
                 );
                 if ( # no version means latest
                     PVE::QemuServer::Machine::extract_version($machine_type)
@@ -1631,6 +1629,14 @@ sub check_bootloader {
             }
         }
     } else {
+        if (!PVE::ProcFSTools::is_mounted('/boot/efi')) {
+            log_warn(
+                "System booted in UEFI mode but the EFI System Partition (ESP) is not mounted at"
+                    . " /boot/efi. Mount it at /boot/efi before upgrading and ensure it mounts"
+                    . " automatically at boot (e.g. via /etc/fstab), otherwise GRUB updates may leave"
+                    . " the system unbootable.");
+            $boot_ok = 0;
+        }
         if (!-f "/usr/share/doc/grub-efi-amd64/changelog.Debian.gz") {
             log_warn("System booted in uefi mode but grub-efi-amd64 meta-package not installed,"
                 . " new grub versions will not be installed to /boot/efi! Install grub-efi-amd64."

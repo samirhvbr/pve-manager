@@ -124,6 +124,18 @@ sub get_cluster_service {
     return $res;
 }
 
+# Ceph metadata can report an FQDN while Proxmox VE node names use the first label. A match is a
+# candidate location, not proof of daemon identity: an unrelated domain can share that label.
+sub metadata_host_node {
+    my ($hostname, $nodes) = @_;
+
+    return $hostname if !defined($hostname) || ref($hostname) || !length($hostname);
+    return $hostname if $nodes->{$hostname};
+
+    my ($short) = $hostname =~ m/^([^.]+)\./;
+    return defined($short) && $nodes->{$short} ? $short : $hostname;
+}
+
 sub ceph_service_cmd {
     my ($action, $service) = @_;
 
@@ -313,7 +325,7 @@ sub create_mds {
         format => 'plain',
     });
 
-    PVE::Tools::file_set_contents($service_keyring, $output);
+    PVE::Tools::file_set_contents($service_keyring, $output, 0600);
 
     print "setting ceph as owner for service directory\n";
     run_command(["chown", 'ceph:ceph', '-R', $service_dir]);
@@ -389,7 +401,7 @@ sub create_mgr {
         ],
         format => 'plain',
     });
-    PVE::Tools::file_set_contents($mgrkeyring, $output);
+    PVE::Tools::file_set_contents($mgrkeyring, $output, 0600);
 
     print "setting owner for directory\n";
     run_command(["chown", 'ceph:ceph', '-R', $mgrdir]);
@@ -525,6 +537,7 @@ my %BENIGN_HEALTH_CHECKS = map { $_ => 1 } qw(
     TELEMETRY_CHANGED
     AUTH_INSECURE_GLOBAL_ID_RECLAIM_ALLOWED
     AUTH_INSECURE_GLOBAL_ID_RECLAIM
+    BLUESTORE_BLUEFS_OVERSIZED
     BLUESTORE_DISK_SIZE_MISMATCH
     BLUESTORE_SLOW_OP_ALERT
     PG_NOT_SCRUBBED
@@ -647,6 +660,14 @@ sub classify_health_checks {
                         . join(', ', @$bad),
                 );
             }
+            next;
+        }
+
+        # The monitors answer 'ok-to-stop' for mon and mds daemons, only the OSD variant goes
+        # through the active manager. No other restart depends on one, and restarting the
+        # managers is what brings one back, so refusing that would block the remedy.
+        if ($name eq 'MGR_DOWN' && defined($service_type) && $service_type ne 'osd') {
+            push @ignored, $name;
             next;
         }
 
@@ -935,7 +956,7 @@ my sub count_old_cipher_entities {
     return $count;
 }
 
-# This view has no staging journal or consumer inventory. Pending keys take precedence over
+# This view has no staging journal or client inventory. Pending keys take precedence over
 # rotation previews, regardless of who staged them or which cipher they would restore.
 sub cephx_migration_verdicts {
     my ($status) = @_;
@@ -1016,7 +1037,7 @@ sub cephx_migration_verdicts {
             . " any keys outside that selection:",
             "$CEPHX_MIGRATION_HELPER --rotate-all-storage-keys --rotate-admin-key";
     } else {
-        # Current keys do not prove that consumers refreshed or that cipher restriction is safe.
+        # Current keys do not prove that clients refreshed or that cipher restriction is safe.
         push @$res,
             "For a helper-managed migration, check whether anything remains:",
             $CEPHX_MIGRATION_HELPER;

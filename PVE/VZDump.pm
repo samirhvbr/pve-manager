@@ -545,7 +545,7 @@ sub send_notification {
         if ($email_configured && ($policy eq "always" || ($policy eq "failure" && $failed))) {
             # Start out with an empty config. Might still contain
             # built-ins, so we need to disable/remove them.
-            my $notification_config = Proxmox::RS::Notify->parse_config('', '');
+            my $notification_config = PVE::RS::Notify->parse_config('', '');
 
             # Remove built-in matchers, since we only want to send an
             # email to the specified recipients and nobody else.
@@ -557,21 +557,20 @@ sub send_notification {
             # verified once the config is serialized. That means that
             # we can rely on that fact that no other endpoint with this name exists.
             my $endpoint_name = "<" . join(",", @$mailto) . ">";
-            $notification_config->add_sendmail_endpoint(
-                $endpoint_name,
-                $mailto,
-                undef,
-                undef,
-                "vzdump backup tool",
-            );
+            $notification_config->add_sendmail_endpoint({
+                name => $endpoint_name,
+                mailto => $mailto,
+                author => "vzdump backup tool",
+            });
 
             my $endpoints = [$endpoint_name];
 
             # Add a matcher that matches all notifications, set our
             # newly created target as a target.
-            $notification_config->add_matcher(
-                "<matcher-$endpoint_name>", $endpoints,
-            );
+            $notification_config->add_matcher({
+                name => "<matcher-$endpoint_name>",
+                target => $endpoints,
+            });
 
             PVE::Notify::notify(
                 $severity, "vzdump", $template_data, $fields, $notification_config,

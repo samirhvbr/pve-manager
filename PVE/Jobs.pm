@@ -5,6 +5,7 @@ use warnings;
 use JSON;
 
 use PVE::Cluster qw(cfs_lock_file cfs_read_file cfs_register_file);
+use PVE::File;
 use PVE::Job::Registry;
 use PVE::Jobs::VZDump;
 use PVE::Jobs::RealmSync;
@@ -14,11 +15,27 @@ PVE::Jobs::VZDump->register();
 PVE::Jobs::RealmSync->register();
 PVE::Job::Registry->init();
 
+# Keep jobs of types this node does not know, e.g. ones added by a newer version on another node
+# of the cluster, instead of dropping them when writing the config.
 cfs_register_file(
     'jobs.cfg',
-    sub { PVE::Job::Registry->parse_config(@_); },
-    sub { PVE::Job::Registry->write_config(@_); },
+    sub { PVE::Job::Registry->parse_config(@_, 1); },
+    sub {
+        my ($filename, $cfg) = @_;
+        # Invalid jobs of known types are undefined entries. Refuse to serialize them as broken
+        # sections.
+        for my $id (sort keys $cfg->{ids}->%*) {
+            die "job '$id' is invalid, fix or remove it in $filename first\n"
+                if !defined($cfg->{ids}->{$id});
+        }
+        PVE::Job::Registry->write_config($filename, $cfg, 1);
+    },
 );
+
+my sub is_known_type {
+    my ($type) = @_;
+    return scalar(grep { $_ eq $type } PVE::Job::Registry->lookup_types()->@*);
+}
 
 my $state_dir = "/var/lib/pve-manager/jobs";
 my $lock_dir = "/var/lock/pve-manager";
@@ -109,11 +126,16 @@ my $get_job_task_status = sub {
 
     my ($task, $filename) = PVE::Tools::upid_decode($state->{upid}, 1);
     die "unable to parse worker upid - $state->{upid}\n" if !$task;
-    die "no such task\n" if !-f $filename;
 
     my $pstart = PVE::ProcFSTools::read_proc_starttime($task->{pid});
     if ($pstart && $pstart == $task->{pstart}) {
         return; # still running
+    }
+
+    # the task log might be gone, e.g. after a crash, do not let that block the job forever
+    if (!PVE::File::file_exists($filename)) {
+        warn "missing task log for $state->{upid}\n";
+        return "task log not found";
     }
 
     return PVE::Tools::upid_read_status($state->{upid});
@@ -293,6 +315,7 @@ sub run_jobs {
     foreach my $id (sort keys %{ $jobs_cfg->{ids} }) {
         my $cfg = $jobs_cfg->{ids}->{$id};
         my $type = $cfg->{type};
+        next if !is_known_type($type);
         my $schedule = delete $cfg->{schedule};
 
         # only schedule local jobs
@@ -344,6 +367,7 @@ sub synchronize_job_states_with_config {
             for my $id (keys $data->{ids}->%*) {
                 my $job = $data->{ids}->{$id};
                 my $type = $job->{type};
+                next if !is_known_type($type);
 
                 my $path = $get_state_file->($id, $type);
                 if (-e $path) {

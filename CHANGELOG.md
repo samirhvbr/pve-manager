@@ -9,6 +9,26 @@ Entrada nova sempre **no topo**. Ver [CLAUDE.md](CLAUDE.md) para a convenção.
 
 ---
 
+## 9.2.26+blue3.1 — Merge upstream pve-manager 9.2.26
+
+**2026-11-07**
+
+- Merged upstream `pve-manager` 9.2.26 (bump commit `41a0e2e0`) into the fork,
+  following [docs/upstream-sync.md](docs/upstream-sync.md). It carries the
+  upstream fixes from 9.2.21 to 9.2.26. Among them:
+  - `GET /pools?poolid=<pool>` checked `Pool.Audit` but ignored the result, so
+    any user could list the members of every pool (9.2.23);
+  - deleting a backup job by ID could delete another kind of job, such as a
+    realm sync job (9.2.26);
+  - line breaks are rejected in an interface's OVS options;
+  - certificate management can be delegated on `/nodes/<node>/certificates`
+    alone (9.2.26).
+- Only `debian/changelog` conflicted. Branding, the Blue3 links and the
+  removed subscription notice merged unchanged. Upstream added no new Proxmox
+  strings or `checked_command()` calls under `www/`.
+- It ships together with the 2026-11-07 security updates on both nodes:
+  kernel 7.0.14-28 and QEMU 11.1.3.
+
 ## 9.2.20+blue3.1 — Merge upstream pve-manager 9.2.20 and redeploy the fork
 
 **2026-11-03: the web redirect also serves the backup server**

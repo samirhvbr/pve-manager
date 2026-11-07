@@ -11,6 +11,8 @@ use Storable qw(dclone);
 use FindBin;
 use PVE::Ceph::KeyMigration qw(
     manual_promotion_support client_key_stageable staged_records
+    parse_storage_key storage_config_problem storage_key_copy_problems storage_key_copy_warnings
+    parse_auth_methods summarize_monitor_authentication
     $CIPHER $LEGACY_CIPHER
     key_cipher key_fingerprint parse_probe_output osd_label_identity needs_rotation mon_keyring_stale
     mon_key_rotation_wanted migration_unfinished unfinished_entities touched_daemons
@@ -33,6 +35,254 @@ use PVE::Ceph::KeyMigration qw(
 my $NEW = 'AgCk941qku/sDSAAIjO5RhRv/ogXhuxccNS4DZxlXS1LUgzEGFIiY/U7IlI=';
 my $OLD = 'AQCP/Y5qflfDFxAAPII6O9qSA7p65js5CEJYDA==';
 my $NONE = 'AACP/Y5qnzxSGAAA';
+
+{
+    my $ring = "[client.vm]\n key = $OLD\n caps mon = \"allow r\"\n";
+    for my $case (
+        ['exact section', $ring, 'keyring', 'client.vm', $OLD],
+        [
+            'multiple sections',
+            "[client.admin]\n key = $NEW\n$ring",
+            'keyring',
+            'client.vm',
+            $OLD,
+        ],
+        ['bare CephFS secret', " $NEW\n", 'secret', 'client.vm', $NEW],
+        ['quoted key', "[client.vm]\n key = \"$OLD\"\n", 'keyring', 'client.vm', $OLD],
+        ['wrong user', $ring, 'keyring', 'client.admin', undef],
+        ['duplicate section', "$ring$ring", 'keyring', 'client.vm', undef],
+        ['duplicate key', "$ring key = $OLD\n", 'keyring', 'client.vm', undef],
+        ['two secrets', "$OLD\n$NEW\n", 'secret', 'client.vm', undef],
+        ['keyring as secret', $ring, 'secret', 'client.vm', undef],
+        ['empty secret', '', 'secret', 'client.vm', undef],
+        ['malformed key', "[client.vm]\n key = garbage\n", 'keyring', 'client.vm', undef],
+        ['truncated blob', substr($OLD, 0, -4), 'secret', 'client.vm', undef],
+        ['ignored caps', "$ring caps osd = \"allow *\n", 'keyring', 'client.vm', $OLD],
+        ['other section without key', "${ring}[client.other]\n", 'keyring', 'client.vm', $OLD],
+        [
+            'auid and comments',
+            "${ring} auid = 18446744073709551615 # owner\n; comment\n",
+            'keyring',
+            'client.vm',
+            $OLD,
+        ],
+        [
+            'quoted key and inline comment',
+            "[client.vm]\n key = '$OLD' # comment\n",
+            'keyring',
+            'client.vm',
+            $OLD,
+        ],
+        [
+            'other invalid key',
+            "${ring}[client.other]\n key = invalid\n",
+            'keyring',
+            'client.vm',
+            $OLD,
+        ],
+    ) {
+        my ($name, $content, $format, $entity, $expected) = @$case;
+        my $result = parse_storage_key($content, $format, $entity);
+        is($result->{key}, $expected, "$name selects only a verified key");
+        ok(
+            $expected ? !$result->{error} : $result->{error},
+            "$name has explicit verification status",
+        );
+        unlike($result->{error} // '', qr/\Q$OLD\E|\Q$NEW\E/, "$name does not disclose secrets");
+    }
+
+    my $path = '/etc/pve/priv/ceph/vm.keyring';
+    is(
+        storage_config_problem("[global]\n keyring = $path\n", $path),
+        undef,
+        'generated external configuration names the inspected file',
+    );
+    for my $value (
+        '"/etc/pve/priv/$cluster/$id.keyring" # generated',
+        "'/etc/pve/priv/ceph/vm.keyring' ; comment",
+        '/etc/pve/priv/${cluster}/${id}.keyring',
+    ) {
+        is(
+            storage_config_problem("[global]\n keyring = $value\n", $path, 'client.vm'),
+            undef,
+            'quoted custom paths expand storage identity and cluster variables',
+        );
+    }
+    for my $value (
+        '/etc/$cluster/$cluster.$name.keyring', '/etc/$cluster/$cluster.$type.$id.keyring',
+    ) {
+        is(
+            storage_config_problem(
+                "[global]\n keyring = $value\n",
+                '/etc/ceph/ceph.client.vm.keyring',
+                'client.vm',
+            ),
+            undef,
+            'name and type metavariables resolve to the configured user',
+        );
+    }
+    for my $content (
+        "[global]\n keyring = /other/path\n",
+        "[global]\n key = $OLD\n",
+        "include /other/config\n",
+        "[global]\n",
+        "[global]\n[global]\n",
+    ) {
+        my $error = storage_config_problem($content, $path);
+        ok($error, 'custom credential indirection is unverified');
+        unlike($error, qr/\Q$OLD\E/, 'configuration errors do not disclose inline keys');
+    }
+
+    my $copy = { store => 'vm', path => $path, entity => 'client.vm', key => $OLD };
+    for my $error (
+        'could not read file',
+        'malformed or ambiguous key file',
+        'alternate credentials',
+        'no verified keyring path',
+    ) {
+        my $unverified = { %$copy, managed => 1, key => undef, error => $error };
+        for my $entity (qw(osd.7 mgr.a mds.a client.osd-lockbox.uuid client.admin client.vm)) {
+            my $problems = storage_key_copy_problems([$unverified], $entity, $OLD, $NEW);
+            is(
+                scalar(@$problems),
+                $entity eq 'client.vm' ? 1 : 0,
+                "$error gates only the configured user, not $entity",
+            );
+        }
+        my $external = { %$unverified, managed => 0, entity => 'client.admin' };
+        is_deeply(
+            storage_key_copy_problems([$external], 'client.admin', $OLD, $NEW),
+            [],
+            'unverified external admin copy does not veto the local admin key',
+        );
+        like(
+            join(' ', storage_key_copy_warnings([$external])->@*),
+            qr/could not be checked:\n  vm: .*If one points at this cluster.*staged key of the same Ceph user/s,
+            'unverified external copy warns without claiming ownership',
+        );
+        $unverified->{entity} = 'client.osd-lockbox.uuid';
+        is_deeply(
+            storage_key_copy_problems([$unverified], 'client.osd-lockbox.uuid', $OLD, $NEW),
+            [],
+            'a storage username matching a lockbox identity does not claim its key',
+        );
+    }
+    my $problems = storage_key_copy_problems([$copy], 'client.admin', $OLD, $NEW);
+    like(
+        join(' ', @$problems),
+        qr/still hold it:\n  vm: /,
+        'matching bytes veto across configured users',
+    );
+    unlike(join(' ', @$problems), qr/\Q$OLD\E|\Q$NEW\E/, 'comparison errors do not disclose keys');
+    is_deeply(
+        storage_key_copy_problems([{ %$copy, key => $NEW }], 'client.vm', $OLD, $NEW),
+        [],
+        'a copy holding the target pending key passes',
+    );
+    is_deeply(
+        storage_key_copy_problems([$copy], 'client.vm', $OLD, $OLD),
+        [],
+        'identical pending and active keys retire no distinct credential',
+    );
+    is_deeply(
+        storage_key_copy_problems([{ %$copy, key => $NONE }], 'client.vm', $OLD, $NEW),
+        [],
+        'an external copy with a different key is not claimed',
+    );
+    ok(
+        @{
+            storage_key_copy_problems(
+                [{ %$copy, key => $NONE, managed => 1 }],
+                'client.vm',
+                $OLD,
+                $NEW,
+            ),
+        },
+        'a third key is not a repaired managed copy',
+    );
+    like(
+        join(' ', @{ storage_key_copy_problems([$copy], 'client.vm', $OLD, $NEW, 1) }),
+        qr/the restored key of the same Ceph user/,
+        'reverse advice names the restored key',
+    );
+}
+
+{
+    for my $case (
+        ['', { cephx => 1 }],
+        [' ;,=\t', undef],
+        [" ;,=\t", { cephx => 1 }],
+        ['none', { none => 1 }],
+        ['cephx;gss,none=cephx', { cephx => 1, gss => 1, none => 1 }],
+        ['CEPHX', undef],
+        ['unknown', undef],
+        [undef, undef],
+        [{}, undef],
+    ) {
+        is_deeply(
+            parse_auth_methods($case->[0]),
+            $case->[1],
+            'authentication methods follow Ceph token rules',
+        );
+    }
+    my $report = sub {
+        my ($cluster, $service, $client) = @_;
+        return {
+            auth_cluster_required => $cluster,
+            auth_service_required => $service,
+            auth_client_required => $client // 'cephx',
+        };
+    };
+    for my $case (
+        ['all none', $report->('none', 'none', 'none'), 0],
+        ['ordinary cephx', $report->('cephx', 'cephx'), 1],
+        ['gss', $report->('gss', 'gss'), 0],
+        ['empty defaults', $report->('', ''), 1],
+        ['service none, cluster cephx', $report->('cephx', 'none'), 0],
+        ['client none, service cephx', $report->('none', 'cephx', 'none'), 1],
+        ['mixed service methods', $report->('none', 'cephx,none'), 1],
+        ['unknown service', $report->('cephx', 'other'), undef],
+        ['missing settings', {}, undef],
+        ['service-only client check', { auth_service_required => 'cephx' }, 1],
+        ['service-only none', { auth_service_required => 'none' }, 0],
+        ['unused client setting', $report->('none', 'cephx', 'other'), 1],
+    ) {
+        my ($name, $entry, $clients) = @$case;
+        my $result = summarize_monitor_authentication(['a', 'b'], { a => $entry, b => $entry });
+        is($result->{client_cephx_available}, $clients, "$name: client acceptance is independent");
+    }
+    my $mixed = summarize_monitor_authentication(
+        ['a', 'b'],
+        {
+            a => $report->('none', 'none'),
+            b => $report->('cephx', 'cephx'),
+        },
+    );
+    is($mixed->{client_cephx_available}, 0, 'one disabled monitor vetoes client changes');
+    my $unknown =
+        summarize_monitor_authentication(['a', 'b'], { a => $report->('cephx', 'cephx') });
+    is_deeply($unknown->{unknown}, ['b'], 'an unavailable monitor is named');
+    ok(!defined($unknown->{client_cephx_available}), 'missing settings never authorize clients');
+    ok(
+        !defined(summarize_monitor_authentication([], {})->{client_cephx_available}),
+        'empty monmap is unknown',
+    );
+
+    for my $key (undef, $OLD) {
+        my $info = {
+            pve_mon_key => $key,
+            sessions => { complete => 1, clients => {} },
+            exported => {},
+            service_cipher => 'aes256k',
+        };
+        my $blockers = join(' ', @{ restrict_blockers($info, {}) });
+        like(
+            $blockers,
+            qr/, see '--rotate-mon-key'/,
+            'monitor-key blockers retain the base wording',
+        );
+    }
+}
 
 # 'ceph-bluestore-tool show-label' pretty-prints, and the probe only strips the newlines, so what
 # the parser really sees is one line full of runs of spaces.
@@ -316,6 +566,22 @@ is(
         1,
         'repairing only the stored copy writes to none of them, so none is validated either',
     );
+
+    # its key is rotated too, so its version is checked. Only the work on its node is skipped.
+    my $stretch = {
+        daemons => {
+            mon => [
+                { entity => 'mon.', id => 'a', managed => 1 },
+                { entity => 'mon.', id => 'b', managed => 1 },
+                { entity => 'mon.', id => 'tiebreaker', managed => 0 },
+            ],
+        },
+    };
+    is(
+        scalar(touched_daemons($stretch, { daemons => [$osd], mon_key => 1 })),
+        4,
+        'a monitor outside the cluster counts as changed as well',
+    );
 }
 
 # --- daemons ceph cannot see ------------------------------------------------------------------
@@ -521,6 +787,18 @@ is(
         sessions => [{ con_type => 'osd', entity_name => '', global_id => [] }],
     }]);
     ok($non_client->{complete}, 'a valid non-client session remains irrelevant');
+
+    my $own_tell = summarize_sessions([{
+        mon => 'a',
+        sessions => [{
+            con_type => 'client',
+            entity_name => 'mon.',
+            global_id => 140,
+            socket_addr => { addr => '10.0.0.3:0' },
+        }],
+    }]);
+    ok($own_tell->{complete}, "a 'mon.' session leaves the picture complete");
+    is_deeply($own_tell->{clients}, {}, "a 'mon.' session is no client of a key to refresh");
 }
 
 # --- the final step is offered once nothing else is open ---------------------------------------
@@ -786,7 +1064,7 @@ is(
     );
     like(
         $open->{waiting_details}->{'client.admin'},
-        qr/consumer verification is incomplete\. Not every monitor answered\./,
+        qr/client verification is incomplete\. Not every monitor answered\./,
         'an incomplete session picture explains the waiter',
     );
     ok(
@@ -2518,7 +2796,7 @@ my sub cluster {
     };
     is(
         describe_sessions($live, $hints),
-        '198.51.100.8: 1, due: 2 (possible consumers: VM 102)',
+        '198.51.100.8: 1, due: 2 (possible clients: VM 102)',
         'known IPs become node names while unknown hosts remain visible',
     );
     is(describe_sessions($live), session_hosts($live), 'without hints the plain host list stays');
@@ -2549,7 +2827,7 @@ my sub cluster {
     )->@*;
     like(
         $blocker,
-        qr/1 live client\(s\) authenticate as 'client\.vm' \(due: 1 \(possible consumers: VM 102\)\)/,
+        qr/1 live client\(s\) authenticate as 'client\.vm' \(due: 1 \(possible clients: VM 102\)\)/,
         'the restriction blocker labels host-wide hints as possible consumers',
     );
 }
@@ -2588,7 +2866,7 @@ my sub cluster {
     is(scalar(@admin), 1, 'a user with live and recorded sessions gets one line');
     like(
         $admin[0],
-        qr/^'client\.admin': 4 session\(s\) may still hold the previous key \(due: 4\).*Refresh these consumers, then rerun without options\.$/,
+        qr/^'client\.admin': 4 session\(s\) may still hold the previous key \(due: 4\).*Refresh these clients, then rerun without options\.$/,
         'only the recorded subset is reported as needing refresh',
     );
     my $unrecorded = { %$state, client_refresh => { %{ $state->{client_refresh} } } };
@@ -2605,7 +2883,7 @@ my sub cluster {
     is(scalar(@tools), 1, 'the open bootstrap and crash records are one line');
     like(
         $tools[0],
-        qr/the rotations of 7 bootstrap and crash keys await their confirmation, which needs no consumer refresh; '--confirm-all-clients-refreshed' closes them/,
+        qr/the rotations of 7 bootstrap and crash keys await their confirmation, which needs no client refresh; '--confirm-all-clients-refreshed' closes them/,
         'saying why no refresh is needed and how to close them',
     );
     ok(!(grep { m/bootstrap-mds' awaits/ } @$blockers), 'and no line per tool key');
@@ -2877,7 +3155,7 @@ my sub cluster {
         like($text, $expected, "$name rollback sessions have direction-specific guidance");
         unlike(
             $text,
-            qr/Refresh consumers/,
+            qr/Refresh clients/,
             'unknown sessions need identification, not another refresh',
         ) if $name eq 'unknown';
         unlike(
@@ -3091,6 +3369,21 @@ my sub cluster {
     );
     is(scalar(@described), 0, 'no host-wide hints are requested just because sessions exist');
 
+    $info->{storage_copy_problems} =
+        { $entity => ['Cannot retire: managed storage still has the old key.'] };
+    $blockers = restrict_blockers($info, $state, $describe, $files);
+    like(
+        $blockers->[0],
+        qr/managed storage still has the old key/,
+        'restriction includes storage readiness',
+    );
+    unlike(
+        $blockers->[0],
+        qr/--confirm-clients-refreshed/,
+        'restriction does not offer a refused confirmation',
+    );
+    delete $info->{storage_copy_problems};
+
     $info->{sessions}->{clients}->{$entity}->[0]->{key_fingerprint} = key_fingerprint($OLD);
     $blockers = restrict_blockers($info, $state, $describe, $files);
     like(
@@ -3106,7 +3399,7 @@ my sub cluster {
     $blockers = restrict_blockers($info, $state, $describe, $files);
     like(
         join(' ', @$blockers),
-        qr/consumer verification is incomplete.*mon-b/,
+        qr/client verification is incomplete.*mon-b/,
         'restriction distinguishes incomplete observation from missing confirmation',
     );
     $info->{sessions}->{complete} = 1;
@@ -3114,7 +3407,7 @@ my sub cluster {
     $blockers = restrict_blockers($info, $state, $describe, $files);
     like(
         $blockers->[0],
-        qr/first complete consumer measurement.*first attempt records/,
+        qr/first complete client measurement.*first attempt records/,
         'a missing measurement does not look ready for retirement',
     );
 }
@@ -3260,6 +3553,58 @@ my sub cluster {
         my $stale = stale_consumers($sessions, $refresh, { 'client.vm' => $target });
         is(ack_decision('client.vm', $state, $sessions, $stale)->{verdict}, $expected, $name);
     }
+}
+
+{
+    my $orphan = 'client.osd-lockbox.orphan';
+    my $live = 'client.osd-lockbox.live';
+    my $info = {
+        exported => { $orphan => { key => $OLD } },
+        lockbox => { $orphan => { orphaned => 1 } },
+        sessions => { complete => 1, clients => {} },
+        service_cipher => $CIPHER,
+        pve_mon_key => $NEW,
+        preferred_cipher => $LEGACY_CIPHER,
+        allowed_ciphers => [$LEGACY_CIPHER, $CIPHER],
+    };
+    my $open = open_actions('helper', {}, {}, {}, $CIPHER, {}, $info);
+    is_deeply(
+        $open->{orphaned_lockbox},
+        [$orphan],
+        'orphaned old lockbox keys have their own action',
+    );
+    is_deeply($open->{next}, [], 'an orphan alone is not offered lockbox rotation or restriction');
+    ok(!$open->{complete}, 'an orphan alone is not migration completion');
+    like(
+        join(' ', restrict_blockers($info, {})->@*),
+        qr/\Q$orphan\E.*no OSD.*leaves it unchanged/,
+        'the restriction blocker explains why lockbox rotation cannot help',
+    );
+
+    $info->{exported}->{$live} = { key => $OLD };
+    $info->{lockbox}->{$live} = { id => 1 };
+    $open = open_actions('helper', {}, {}, {}, $CIPHER, {}, $info);
+    like(
+        join(' ', $open->{next}->@*),
+        qr/--rotate-lockbox-keys/,
+        'live OSD keys still get the rotation option',
+    );
+    is_deeply($open->{orphaned_lockbox}, [$orphan], 'mixed inventory keeps the orphan separate');
+
+    $info->{exported}->{$orphan} = { key => $NEW };
+    $open = open_actions('helper', {}, {}, {}, $CIPHER, {}, $info);
+    is_deeply(
+        $open->{orphaned_lockbox},
+        [],
+        'an orphan already using the new cipher needs no deletion',
+    );
+    $info->{exported}->{$orphan}->{pending_key} = $OLD;
+    $open = open_actions('helper', {}, {}, {}, $CIPHER, {}, $info);
+    is_deeply(
+        $open->{orphaned_lockbox},
+        [$orphan],
+        'an orphan with an old pending key still blocks restriction',
+    );
 }
 
 done_testing();

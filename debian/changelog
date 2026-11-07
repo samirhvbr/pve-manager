@@ -1,3 +1,298 @@
+pve-manager (9.2.26+blue3.1) trixie; urgency=medium
+
+  * merge upstream 9.2.26 into the Blue3 Cloud fork; branding, Blue3 links
+    and subscription-notice removal carried over unchanged
+
+ -- Blue3 <samir@blue3.com.br>  Sat, 07 Nov 2026 18:00:00 -0300
+
+pve-manager (9.2.26) trixie; urgency=medium
+
+  * api: backup: extract config: also allow it with the Datastore.Allocate
+    permission on the storage, like restoring a backup does.
+
+  * fix #8169: api: backup: extract config: allow extracting the
+    configuration of guest backups without a guest ID again, for example of
+    manually renamed backups.
+
+  * ceph: osd: create: rewrite an outdated bootstrap-osd keyring with the key
+    from the auth database. A stale key, for example on a node restored from
+    a backup taken before a key rotation, made OSD creation fail with "RADOS
+    permission denied".
+
+  * api: backup: only delete backup jobs. Passing the ID of another job, like
+    a realm sync job, deleted that job.
+
+  * jobs: keep jobs of unknown types in jobs.cfg. During a rolling upgrade,
+    editing any job on a node that was not upgraded yet removed jobs of newly
+    added types for the whole cluster.
+
+  * api: replication: describe the returned job status in the API schema, so
+    API clients, like the Proxmox Datacenter Manager, and the API viewer can
+    show the job states.
+
+  * fix #7513: certificates: check the permissions on the
+    '/nodes/<node>/certificates' path instead of the whole node, and offer it
+    in the permission path selector, so certificate management can be
+    delegated with least privileges.
+
+  * firewall: vnet: only list the VNets of the running SDN configuration in
+    the VNet firewall dialog, as the permissions are checked against it.
+
+  * ui: fix showing "(undefined)" in the title of the tag context menu in
+    clusters, and drop a redundant '#' from the ASN label of SDN controllers.
+
+  * fix #5001: ui: add a context menu with guest bulk actions to pools in the
+    pool view of the resource tree, like the tag view has.
+
+  * notifications: support nested match rules through the new 'expression'
+    option of matchers, which combines calendar, field and severity rules
+    with all-of, any-of, one-of and their negations at any depth:
+    - the matcher editor of the web interface uses it, and shows existing
+      matchers converted to an equivalent expression.
+    - the API refuses to save matchers with an expression while a cluster
+      node reports an older version, as such nodes cannot parse them. Nodes
+      without a reported version are not checked, so upgrade all nodes first.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 04 Nov 2026 22:30:08 +0100
+
+pve-manager (9.2.25) trixie; urgency=medium
+
+  * ceph: allow the installation wizard to select any Ceph release supported
+    by the target node, even when the node serving the web interface has a
+    different architecture or Proxmox VE major version.
+
+  * ui: virtual machines: only offer TPM 2.0 for aarch64 guests, as TPM 1.2 is
+    not supported by their QEMU device and firmware.
+
+  * certificates:
+    - renew the cluster CA during the daily update before its remaining
+      validity shortens node certificates, and log the expiry of renewed node
+      certificates. Clients trusting the CA directly must import the renewed
+      CA certificate before the previous one expires.
+    - re-issue node certificates signed by a replaced cluster CA, so nodes
+      that were offline during CA rotation recover on their next daily update.
+    - mark expired and near-expiry certificates in the web interface, with a
+      shorter warning window for short-lived certificates to avoid warning
+      before their normal renewal time.
+
+  * fix #8195: ceph: lock configuration updates when creating or removing
+    metadata servers, preventing concurrent tasks from overwriting each
+    other's changes or leaving stale MDS sections behind.
+
+  * fix #8184: ui: settings: allow Remote Resizing as the default noVNC scaling
+    mode, so the guest display can follow the console window size when
+    supported.
+
+  * ceph: order all ceph-* services, RBD mappings and CephFS mirroring after
+    the cluster filesystem at boot, avoiding failures from reading their
+    configuration before /etc/pve is mounted.
+
+  * fix #8006: acme: base automatic renewal and the API renewal threshold on
+    the certificate lifetime instead of a fixed 30 days. This avoids
+    unnecessary daily renewals and CA rate limits for shorter-lived
+    certificates while retaining at least three days for retries.
+
+ -- Proxmox Support Team <support@proxmox.com>  Tue, 27 Oct 2026 22:14:54 +0100
+
+pve-manager (9.2.24) trixie; urgency=medium
+
+  * api: node shell: harden the console against crafted parameters by only
+    passing the known Ceph version and repository options to the command of
+    the Ceph installation wizard, rejecting any other parameter.
+
+  * ui: consent banner: fix loading the web interface when the consent text
+    contains a single quote, which broke the JavaScript of the page. This only
+    affected texts set outside the web interface, for example through the API,
+    as the web interface stores them base64-encoded.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 23 Oct 2026 19:51:57 +0200
+
+pve-manager (9.2.23) trixie; urgency=medium
+
+  * ceph: add Ceph 21.2 Umbrella as an experimental release, which
+    'pveceph install' and the installation wizard offer for testing. This
+    also lets the wizard recognize a cluster that already runs Umbrella when
+    adding a node, instead of reporting that it found no Ceph installation.
+
+  * ceph: OSD flags: offer the 'noautoscale' flag, which pauses the PG
+    autoscaler for all pools. This helps during maintenance and upgrades, for
+    example to Ceph 21 Umbrella, which doubles the autoscaler's target of PGs
+    per OSD and could otherwise start splitting PGs while daemons of both
+    versions run. The web interface also shows whether the flag is set, as
+    Ceph raises no health warning for it.
+
+  * ceph: rolling restart: let a missing active manager (MGR_DOWN) only block
+    OSD restarts, as only their safety check needs the manager. During an
+    upgrade, managers still running the old version can stop reporting to the
+    upgraded monitors, which left no manager active and blocked restarting
+    the managers, even with Force once Ceph raised the check to HEALTH_ERR.
+
+  * ceph: rolling restart: do not let BLUESTORE_BLUEFS_OVERSIZED warnings
+    block. Ceph 21 Umbrella OSDs can raise this space usage advisory right
+    after their upgrade, which made the restart refuse every further node
+    unless forced.
+
+  * api: resource pools: require the Pool.Audit privilege on a pool when
+    querying it with 'GET /pools?poolid=<pool>'. The permission was checked,
+    but its result was ignored, so any user could list the members of every
+    pool.
+
+  * api: network: reject line breaks in the OVS options of an interface, as
+    the value is written as is into /etc/network/interfaces.
+
+  * ui: ceph: service list: allow restarting a monitor, manager or MDS shown
+    as stopped. The shown state comes from the cluster, so a daemon whose
+    service runs but does not report in, such as a manager not reporting to
+    upgraded monitors, only offered Start, which did nothing.
+
+  * ceph: Cephx key migration: support Ceph daemons on hosts outside this
+    Proxmox VE cluster, such as the tiebreaker monitor of a stretch cluster.
+    Previously, such a monitor made the helper refuse staging client keys and
+    switching the service cipher, and made the monitor key rotation fail:
+    - query such monitors with 'ceph tell' instead of over SSH
+    - judge their cipher support by the version they run, and refuse if they
+      are not reported as running
+    - rotate the 'mon.' key without writing their keyring or restarting them,
+      print the commands to refresh their emergency keyring, and check that
+      they remain in the quorum
+    - warn about key copies such hosts keep for their own use, for example of
+      'client.admin', and print the commands to refresh them
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 19 Oct 2026 20:18:22 +0200
+
+pve-manager (9.2.22) trixie; urgency=medium
+
+  * fix #8015: ui: upload and download from URL: let the user choose the
+    format of '.img' images for import content, instead of always treating
+    them as raw images. The '.img' extension is also used for other formats,
+    for example by the qcow2 based Ubuntu cloud images, which were imported as
+    raw disks that did not boot.
+
+  * fix #6475: ui: upload: show only the name of the selected file, instead of
+    the 'C:\fakepath\' path that browsers report on every platform.
+
+  * fix #5608: ui: resource mappings: validate the names of PCI, USB and
+    directory mappings like the API does, so that an invalid name is marked
+    right away with a hint about the allowed characters, instead of failing
+    with a generic error on submit.
+
+  * fix #7108: ui: firewall: IPSet: do not offer aliases that are already part
+    of the IPSet, as adding them again only fails with an 'already exists'
+    error.
+
+  * ui: container features: drop the 'Experimental' label from the 'Create
+    Device Nodes' option, as the feature is considered stable.
+
+  * ui: SDN: zone edit: opening the dialog no longer marks the DNS server
+    fields as changed, which enabled the reset button and allowed submitting
+    an unchanged form.
+
+  * fix #6735: api: PCI: allow listing the mediated device types of a PCI
+    mapping with Mapping.Use, Mapping.Modify or Mapping.Audit on that mapping.
+    Previously Sys.Audit or Sys.Modify on '/' was required, so other users
+    could not choose a mediated device type for a mapped PCI device.
+
+  * api: node status: return the idle time from /proc/uptime as 'idle', which
+    was always 0, and document 'idle' and 'uptime' in the return schema, so
+    that generated API clients can access them.
+
+  * fix #4986: jobs: schedule a job again if the task log of its last run is
+    missing, for example after a crash. Previously the job was skipped with
+    'could not update job state, skipping - no such task' on every scheduler
+    iteration until its state file was removed manually.
+
+  * fix #8093: pvestatd: drop the periodic cleanup of stale container
+    consoles, which queried the status of every running container a second
+    time in each update cycle, an overhead growing with the number of
+    containers. Consoles exit on their own when their container stops; the
+    cleanup only mattered in broken states, such as a container config
+    removed while the container still runs.
+
+  * ceph: create the keyrings of new MDS and manager daemons and the OSD
+    bootstrap keyring with mode 0600 instead of 0644, as their keys can access
+    every pool or register OSDs. Before, only the 0750 /var/lib/ceph directory
+    kept other local users out. Existing keyrings are not changed.
+
+  * fix #8163: ceph: pool create: pass the CRUSH rule of replicated pools to
+    Ceph on creation, instead of setting it afterwards. Ceph checks the
+    'mon_max_pg_per_osd' limit against the rule a pool is created with, so a
+    pool with a non-default rule could be refused because the OSDs of the
+    default rule were near the limit, while it was never checked against its
+    own rule.
+
+  * fix #8046: ui: ceph: fix muting a health check with 'No expiry', which the
+    API rejected with an invalid 'ttl' error.
+
+  * fix #8098: ui: ceph: OSD: sort the OSD tree naturally by name, so that
+    osd.10 comes after osd.8 and a host pve10 after pve2.
+
+  * ceph: Cephx key migration: state plainly in the closing summary that no
+    authentication health error remains, as the previous wording was read as
+    something still left to do.
+
+  * pve8to9: warn if the EFI System Partition (ESP) of a UEFI system is not
+    mounted at /boot/efi, as the system may then fail to boot after the GRUB
+    update of the upgrade. Systems using proxmox-boot-tool are skipped, as it
+    mounts the ESPs itself.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 15 Oct 2026 22:35:27 +0200
+
+pve-manager (9.2.21) trixie; urgency=medium
+
+  * ui: VM CD/DVD drive: change the medium through an API task, so that its
+    warnings, for example about problematic VirtIO driver ISO versions, are
+    shown.
+
+  * ui: pool selector: allow typing to search, which helps with many pools.
+
+  * backup: extracting the configuration of a backup that belongs to no guest,
+    for example a host backup on Proxmox Backup Server, now fails with a clear
+    error instead of also printing a Perl warning.
+
+  * ceph: OSD destroy: also remove the lockbox key and the dm-crypt key of an
+    encrypted OSD. Both were left behind in the monitors, and the lockbox key
+    then showed up as an insecure key during the Cephx key migration.
+
+  * ceph: FQDN host names: count outdated OSDs on nodes whose host name is an
+    FQDN for the OSD rolling restart, which previously reported nothing to do,
+    and show one entry per service in the daemon metadata.
+
+  * ceph: Cephx key migration:
+    - support nodes whose host name is an FQDN; previously every run that
+      judged service daemons was refused, and node commands now only run on
+      cluster members
+    - refuse to retire a key that a storage key copy still holds, for example
+      that of a storage naming the local monitors through 'monhost', whose
+      copy the helper does not update; the plan names such copies
+    - retry the monitor session query after the migration's own monitor
+      elections, instead of refusing the cipher restriction because not every
+      monitor answered, and likewise for the summary after a run
+    - check libpve-storage-perl, librados2, and librbd1 on every node using a
+      key before staging it, including nodes that only run guests
+    - refuse client key changes if the monitors do not accept Cephx from
+      clients, as a new storage key file would then break that storage
+    - refuse rotating the shared monitor key below three monitors, where the
+      rolling monitor restart cannot keep quorum
+    - detect an unreadable monitor key in the dry run instead of failing
+      during the apply run
+    - name orphaned lockbox keys and stale service entries as what blocks the
+      final step, with the removal commands to use after verification
+    - allow rerunning the final confirmation command when nothing is left to
+      confirm
+    - name guests with an ISO or bind mount on a CephFS mount that blocks the
+      key refresh
+    - write the lockbox key tag of encrypted OSDs through the LVM shell
+      instead of an embedded Python helper
+    - clarify guidance: live migration also refreshes kernel RBD disks, so
+      only containers on RBD need a restart; the rotating service key warning
+      does not need to clear first; say 'client' instead of 'consumer'
+
+  * d/control: require libpve-storage-perl 9.1.9 or newer, which accepts
+    keyrings holding an aes256k key; older versions leave RBD and CephFS
+    storages that use a migrated key inactive.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 24 Sep 2026 19:51:05 +0200
+
 pve-manager (9.2.20+blue3.1) trixie; urgency=medium
 
   * merge upstream 9.2.20 into the Blue3 Cloud fork; branding, Blue3 links

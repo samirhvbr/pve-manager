@@ -272,8 +272,8 @@ __PACKAGE__->register_method({
     method => 'GET',
     description => "Extract configuration from vzdump backup archive.",
     permissions => {
-        description =>
-            "The user needs 'VM.Backup' permissions on the backed up guest ID, and 'Datastore.AllocateSpace' on the backup storage.",
+        description => "The user needs 'Datastore.Allocate' on the backup storage, or both"
+            . " 'VM.Backup' on the backed up guest ID and 'Datastore.AllocateSpace' on the backup storage.",
         user => 'all',
     },
     protected => 1,
@@ -302,11 +302,6 @@ __PACKAGE__->register_method({
         PVE::Storage::check_volume_access(
             $rpcenv, $authuser, $storage_cfg, undef, $volume, 'backup',
         );
-
-        if (PVE::Storage::parse_volume_id($volume, 1)) {
-            my (undef, undef, $ownervm) = PVE::Storage::parse_volname($storage_cfg, $volume);
-            $rpcenv->check($authuser, "/vms/$ownervm", ['VM.Backup']);
-        }
 
         return PVE::Storage::extract_vzdump_config($storage_cfg, $volume);
     },

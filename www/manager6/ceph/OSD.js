@@ -464,6 +464,15 @@ Ext.define('PVE.window.CephBulkRestartOSDs', {
                         if (!host) {
                             continue;
                         }
+                        if (!Object.hasOwn(nodeVer, host) && !Object.hasOwn(me.osdsByHost, host)) {
+                            let short = host.split('.')[0];
+                            if (
+                                Object.hasOwn(nodeVer, short) ||
+                                Object.hasOwn(me.osdsByHost, short)
+                            ) {
+                                host = short;
+                            }
+                        }
                         counts[host] ||= 0;
                         let installed = nodeVer[host];
                         if (!installed || osd.ceph_version_short !== installed) {
@@ -1193,6 +1202,10 @@ Ext.define('PVE.node.CephOsdTree', {
             text: 'Name',
             dataIndex: 'name',
             width: 150,
+            sorter: {
+                sorterFn: (a, b) =>
+                    a.data.name.localeCompare(b.data.name, undefined, { numeric: true }),
+            },
         },
         {
             text: 'Type',

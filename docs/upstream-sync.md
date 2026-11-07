@@ -1,6 +1,7 @@
 # Following upstream without losing the fork
 
-**First done:** 2026-09-24 · 9.2.10+blue3.1 → 9.2.20+blue3.1
+**First done:** 2026-09-24 · 9.2.10+blue3.1 → 9.2.20+blue3.1  
+**Last done:** 2026-11-07 · 9.2.20+blue3.1 → 9.2.26+blue3.1
 
 ---
 
@@ -91,7 +92,7 @@ git diff <old-bump> <new-bump> -- www/ | grep -E '^\+' \
     | grep -iE 'proxmox virtual|proxmox\.com|subscription|checked_command'
 ```
 
-The 9.2.10 → 9.2.20 sync found none.
+The 9.2.10 → 9.2.20 and 9.2.20 → 9.2.26 syncs found none.
 
 ### 5. Bump and record
 

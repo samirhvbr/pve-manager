@@ -279,6 +279,7 @@ __PACKAGE__->register_method({
         # only check now, we want to allow calls with scope 'versions' on non-ceph nodes too!
         PVE::Ceph::Tools::check_ceph_inited();
         my $rados = PVE::RADOS->new();
+        my $nodes = { map { $_ => 1 } PVE::Cluster::get_nodelist()->@* };
 
         for my $type (qw(mon mgr mds)) {
             my $typedata = PVE::Ceph::Services::get_cluster_service($type);
@@ -292,8 +293,11 @@ __PACKAGE__->register_method({
             # get data from metadata call and merge 'our' data
             my $services = $rados->mon_command({ prefix => "$type metadata" });
             for my $service (@$services) {
-                my $hostname = $service->{hostname};
+                my $hostname = PVE::Ceph::Services::metadata_host_node(
+                    $service->{hostname}, $nodes,
+                );
                 next if !defined($hostname); # can happen if node is dead
+                $service->{hostname} = $hostname;
 
                 my $servicename = $service->{name} // $service->{id};
                 my $id = "$servicename\@$hostname";
@@ -491,8 +495,10 @@ __PACKAGE__->register_method({
                     . " known to be harmless for a rolling restart, never block and are named"
                     . " in the task log. The cluster-wide OSD map flags are only ever"
                     . " evaluated for an OSD restart, since they govern nothing a mon, mgr or"
-                    . " mds restart touches. The operator is responsible for confirming the"
-                    . " cluster is stable enough to absorb a rolling restart.",
+                    . " mds restart touches. Likewise, a missing active manager (MGR_DOWN) only"
+                    . " blocks an OSD restart, as only the OSD safety check needs a manager."
+                    . " The operator is responsible for confirming the cluster is stable enough"
+                    . " to absorb a rolling restart.",
                 type => 'boolean',
                 optional => 1,
                 default => 0,
@@ -619,7 +625,9 @@ __PACKAGE__->register_method({
                     # dialog so the run actually visits hosts the dialog showed work for.
                     my %outdated_count;
                     for my $osd (@{ $osd_meta // [] }) {
-                        my $host = $osd->{hostname};
+                        my $host = PVE::Ceph::Services::metadata_host_node(
+                            $osd->{hostname}, $known_nodes,
+                        );
                         my $running = $osd->{ceph_version_short};
                         next if !$host || !$running;
                         my $installed = $node_vers->{$host}->{version}->{str};

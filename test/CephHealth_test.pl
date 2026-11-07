@@ -72,6 +72,22 @@ my $tests = [
         sev => 'HEALTH_OK',
     },
     {
+        # Umbrella OSDs raise this right after their upgrade, between the nodes of a rolling
+        # restart, and it reports space usage, not whether stopping an OSD is safe.
+        name => 'BlueFS usage beyond the warn ratio does not block',
+        checks => {
+            BLUESTORE_BLUEFS_OVERSIZED => check(
+                'HEALTH_WARN',
+                '2 OSD(s) have BlueFS usage exceeding configured ratio of main device size',
+            ),
+        },
+        expected => undef,
+        ignored => ['BLUESTORE_BLUEFS_OVERSIZED'],
+        acceptable => 1,
+        acceptable_forced => 1,
+        sev => 'HEALTH_OK',
+    },
+    {
         name => 'a real error next to the cephx checks still blocks',
         checks => { $cephx->%*, PG_UNAVAILABLE => check('HEALTH_ERR', 'no data') },
         expected => 'HEALTH_ERR',
@@ -284,6 +300,35 @@ is_deeply(
         $status->{health}->{checks}->{OSDMAP_FLAGS}->{'blocks-restart'},
         { osd => 1, mon => 0, mgr => 0, mds => 0 },
         'the annotation reports the OSD flags per daemon type',
+    );
+}
+
+# Only an OSD restart depends on an active manager, through 'osd ok-to-stop'. Ceph raises
+# MGR_DOWN to HEALTH_ERR once no manager was active for a while, which must not refuse the
+# restart of the managers that brings one back.
+{
+    my $health = { checks => { MGR_DOWN => check('HEALTH_ERR', 'no active mgr') } };
+    my $rados = FakeRados->new('', $health);
+
+    for my $type (qw(mon mgr mds)) {
+        my ($worst, $blockers, $ignored) =
+            PVE::Ceph::Services::classify_health_checks($rados, $health, $type);
+        is($worst, undef, "a missing manager does not block a $type restart");
+        is_deeply($ignored, ['MGR_DOWN'], "MGR_DOWN is ignored for $type");
+    }
+
+    my ($worst) = PVE::Ceph::Services::classify_health_checks($rados, $health, 'osd');
+    is($worst, 'HEALTH_ERR', 'a missing manager does block an osd restart');
+
+    my ($unknown) = PVE::Ceph::Services::classify_health_checks($rados, $health, undef);
+    is($unknown, 'HEALTH_ERR', 'a missing manager is judged strictly for an unknown type');
+
+    my $status = { health => { checks => $health->{checks} } };
+    PVE::Ceph::Services::annotate_restart_blocking($status, $rados);
+    is_deeply(
+        $status->{health}->{checks}->{MGR_DOWN}->{'blocks-restart'},
+        { osd => 1, mon => 0, mgr => 0, mds => 0 },
+        'the annotation reports a missing manager as blocking only OSD restarts',
     );
 }
 
