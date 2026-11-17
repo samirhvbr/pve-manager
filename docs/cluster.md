@@ -1,11 +1,14 @@
 # Cluster `blue3-lab` — topology and quorum
 
-**As of:** 2026-10-27 · Every node runs `pve-manager 9.2.20+blue3.1` on hold
+**As of:** 2026-11-17 · b3p1 and spx1 run `pve-manager 9.2.26+blue3.1` on
+hold. pr9 and sgpu1 joined that day and still run stock `pve-manager` (9.2.2
+and 9.2.3): their addresses have no internet access yet, so they cannot be
+upgraded to the fork's base.
 
 One cluster that holds every physical host. **Any member serves the UI for the
 whole cluster.** There is no dedicated entry-point node. Use
 `100.64.65.160` or `100.64.65.202` (bare IP works, thanks to the 80/443
-redirect).
+redirect, which pr9 and sgpu1 do not have yet).
 
 The name `blue3-lab` is left over from when the cluster was only the lab.
 Renaming it means editing `cluster_name` and restarting corosync on every
@@ -19,10 +22,16 @@ node. That is deferred.
 |---|---|---|---|
 | b3p1 | 100.64.65.160 | physical host | 3 |
 | spx1 | 100.64.65.202 | physical host, production guests | 3 |
+| pr9 | 100.64.65.112 | physical host (Dell R720), no guests yet; joined 2026-11-17 | 3 |
+| sgpu1 | 100.64.65.111 | physical host (Dell R720) with a GPU passed through to one VM; joined 2026-11-17 | 3 |
 
-Expected votes: 6, quorum: 4. HA is not configured, so losing quorum never
+Expected votes: 12, quorum: 7. HA is not configured, so losing quorum never
 fences or reboots anything: `/etc/pve` becomes read-only and guests keep
 running.
+
+How the two new hosts joined: [new-node.md](new-node.md) for pr9 (fresh
+install) and [join-existing-host.md](join-existing-host.md) for sgpu1 (one VM,
+renamed before the join).
 
 ## Votes: 3 per physical host
 
@@ -32,17 +41,18 @@ exactly like 1 each. The rule exists so that the numbers stay right if a
 non-host member is ever added again. That was the case until 2026-09-25, see
 below.
 
-With two hosts, both must be up for quorum:
+With four hosts, any one of them can be down:
 
-| Situation | Votes up | Quorate (≥ 4)? |
+| Situation | Votes up | Quorate (≥ 7)? |
 |---|---|---|
-| both up | 6 | yes |
-| one host reboots | 3, then 6 once it is back | yes after the reboot, and its guests autostart |
-| one host down for a while | 3 | no. The other host's guests keep running but cannot be managed |
-| one host down **and** the other reboots | 3 | no. Needs `pvecm expected 3` to autostart guests |
+| all four up | 12 | yes |
+| one host down or rebooting | 9 | yes. The others keep full management |
+| two hosts down | 6 | no. The remaining hosts' guests keep running but cannot be managed |
 
-A third physical host (9 votes, quorum 5), or a QDevice on an independent
-machine, lets any single host fail.
+Until 2026-11-17 the cluster had only b3p1 and spx1 (6 votes, quorum 4), so a
+reboot of either host left the other without quorum. *Rebooting a host* below
+was written in that period. With four hosts, rebooting one no longer costs
+quorum.
 
 ## Rebooting a host
 
@@ -71,9 +81,13 @@ Done on both hosts on 2026-11-07 for a kernel update. One host at a time.
 
 ## Bridges
 
-Both nodes have the same two bridges, with the same names, so a guest's
+b3p1 and spx1 have the same two bridges, with the same names, so a guest's
 config works on either node and ACLs on `/sdn/zones/localnetwork/<bridge>`
 cover both.
+
+pr9 and sgpu1 are different for now. Their `vmbr0` sits on the 1G copper port
+`nic0`, which also carries management and corosync, and they have no `vmbr1`.
+Their two 10G ports have QSFP-to-4×SFP+ breakout cables and no link yet.
 
 | Bridge | Port | Kind | What it carries |
 |---|---|---|---|

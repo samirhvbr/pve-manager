@@ -1,8 +1,10 @@
 # Joining a host that already runs guests
 
-**Done once:** spx1, 2026-09-25. It had 16 guests (11 running), and it joined
-without a reboot or a guest restart: the guest PIDs were identical before and
-after.
+**Done twice:**
+- **spx1, 2026-09-25.** It had 16 guests (11 running), and it joined without a
+  reboot or a guest restart: the guest PIDs were identical before and after.
+- **sgpu1, 2026-11-17.** It had one VM, with a GPU passed through, and it was
+  renamed right before the join. See *Second time: sgpu1* below.
 
 This is the hard case of [new-node.md](new-node.md), step 2. A fresh host
 needs none of it.
@@ -129,3 +131,42 @@ step 4 (web redirect).
   removed from the cluster the same day ([cluster.md](cluster.md), *History*).
 - **The certificate was not generated**, and `pvecm updatecerts --force`
   fixed it.
+
+## Second time: sgpu1 (2026-11-17)
+
+A Dell R720 installed as `spve1`, with one VM (a GPU passed through,
+two snapshots). It joined as `sgpu1`. Everything ran from one script on the
+workstation, with the restore chained to `pvecm add` as above. What was new:
+
+- **The VMID collided with a template.** The host's VM 100 had the same ID as
+  a template on spx1 that has linked clones. A template on directory storage
+  cannot be renumbered: its clones point at `100/base-100-disk-0.qcow2`. The
+  host's VM was renumbered instead (100 → 134) with
+  [`renumber-vms.sh`](../blue3-deploy/cluster/renumber-vms.sh), which also
+  renamed the `snap_` volumes. Its old ID also had backups on the PBS that
+  belonged to the template, which is another reason to move the newcomer.
+- **Renaming a node: `/etc/hostname` alone breaks it.** The host was rebooted
+  with `sgpu1` in `/etc/hostname` while `/etc/hosts` still mapped `spve1` to
+  its install-time IP. `pve-cluster` could not resolve the new name and did
+  not start. So `/etc/pve` was not mounted, the UI was down, the VM did not
+  autostart, and **every SSH key login failed**, because
+  `/root/.ssh/authorized_keys` is a symlink into `/etc/pve`. Only the root
+  password still worked. The fix:
+  1. put `<ip> <name>.<domain> <name>` in `/etc/hosts`;
+  2. restart `pve-cluster`, `pvedaemon`, `pveproxy` and `pvestatd`;
+  3. move the guest configs from `/etc/pve/nodes/<old>/` to
+     `/etc/pve/nodes/<new>/`.
+
+  Rename before the join, in that order.
+- **The IP was also the iDRAC's.** Two MACs answered ARP for the host's
+  address. Connections from the workstation, which are routed through the
+  gateway, sometimes reached the iDRAC instead, and SSH reported a changed
+  host key. The join script now starts by sending ARP requests from a member
+  and refuses to go on unless exactly one MAC answers.
+- **No internet on the new address.** The host could reach the internal
+  Debian mirror but not the Proxmox repositories or NTP. Its clock was 19 s
+  off. chrony was pointed at the office's AD domain controllers, which answer
+  NTP, and stepped once before the join.
+- **Storages.** `local-lvm` and `ISO` already existed in the cluster, with the
+  same VG, pool and path, restricted to other nodes. The restore appended
+  `sgpu1` to their `nodes` list instead of recreating them.

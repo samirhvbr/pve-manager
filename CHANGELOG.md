@@ -11,6 +11,23 @@ Entrada nova sempre **no topo**. Ver [CLAUDE.md](CLAUDE.md) para a convenção.
 
 ## 9.2.26+blue3.1 — Merge upstream pve-manager 9.2.26
 
+**2026-11-17: pr9 and sgpu1 join the cluster**
+
+The package is unchanged, so the version stays the same.
+
+- Two more physical hosts joined with 3 votes each: the cluster has 12 votes,
+  quorum 7, and any one host can now be down.
+  - pr9 was a fresh install ([docs/new-node.md](docs/new-node.md)).
+  - sgpu1 had one VM; it was renamed and its VM renumbered first
+    ([docs/join-existing-host.md](docs/join-existing-host.md), *Second time:
+    sgpu1*).
+- [docs/new-node.md](docs/new-node.md), step 1: before a join, check the
+  `/etc/hosts` entry, that only one MAC answers the host's IP, and that the
+  clock is synchronized.
+- [docs/cluster.md](docs/cluster.md): members table, the four-host quorum
+  table, and the new hosts' bridges.
+- New queue snapshot [.continue/README_20261117.md](.continue/README_20261117.md).
+
 **2026-11-07**
 
 - Merged upstream `pve-manager` 9.2.26 (bump commit `41a0e2e0`) into the fork,

@@ -17,6 +17,11 @@ nos dois — rollback disponível.
 
 Cluster `blue3-lab`, quorado, link único no `ens18` (rede de gerência).
 
+> **2026-11-17: pr9 (`100.64.65.112`) and sgpu1 (`100.64.65.111`) joined the
+> cluster.** Both are Dell R720 hosts, with 3 votes each, and they still run
+> stock `pve-manager` until their addresses get internet access. See
+> [cluster.md](cluster.md).
+
 > **2026-09-25: b3pve1 and b3pve2 left the cluster.** They are VMs 111 and
 > 112 on spx1. For a few hours they were members of the production cluster,
 > which now holds only the physical hosts (b3p1, spx1). They are standalone

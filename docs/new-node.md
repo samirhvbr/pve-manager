@@ -12,7 +12,17 @@ lives in [`blue3-deploy/`](../blue3-deploy/) and is applied per node.
 
 - `hostname -f` returns the final name. **The PVE node name is fixed at
   install time.**
-- `hostname -i` returns the management IP, not `127.0.1.1`.
+- `hostname -i` returns the management IP, not `127.0.1.1`. Check
+  `/etc/hosts` by hand: the installer writes the IP the host had at install
+  time. On 2026-11-17, pr9's entry pointed at its iDRAC's address, and sgpu1's
+  at an old IP on another network.
+- **Only one machine answers the IP.** Send ARP requests for it from a member
+  and expect a single MAC. sgpu1 shared its address with its iDRAC, which
+  showed up as a changed SSH host key.
+- **The clock is synchronized.** A host without internet access gets no NTP.
+  The office's AD domain controllers answer NTP; point chrony at them. pr9's
+  clock was 3 h behind because its hardware clock held local time; write it
+  back in UTC (`timedatectl set-local-rtc 0`, `hwclock --systohc --utc`).
 - If the node was cloned from a template, regenerate `machine-id` and the SSH
   host keys. Detail: [lab.md](lab.md), *Preparação do SO*.
 
