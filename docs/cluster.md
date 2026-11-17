@@ -1,15 +1,13 @@
 # Cluster `blue3-lab` — topology and quorum
 
-**As of:** 2026-11-17 · b3p1 and spx1 run `pve-manager 9.2.26+blue3.1` on
-hold. pr9 and sgpu1 joined that day and still run stock `pve-manager` (9.2.2
-and 9.2.3): their addresses have no internet access yet, so they cannot be
-upgraded to the fork's base.
+**As of:** 2026-11-17 · All four nodes run `pve-manager 9.2.26+blue3.1` on
+hold. b3p1 and spx1 boot kernel 7.0.14-28; pr9 and sgpu1, which joined that
+day, boot 7.0.14-29.
 
 One cluster that holds every physical host. **Any member serves the UI for the
 whole cluster.** There is no dedicated entry-point node. Use
 `100.64.65.160` or `100.64.65.202` (bare IP works, thanks to the 80/443
-redirect; pr9 and sgpu1 got it on 2026-11-17, but show the stock Proxmox
-branding until they get the fork).
+redirect, installed on all four).
 
 The name `blue3-lab` is left over from when the cluster was only the lab.
 Renaming it means editing `cluster_name` and restarting corosync on every
