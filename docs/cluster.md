@@ -139,6 +139,37 @@ deletes the file. spx1 had one from 2026-09-21 (it only reordered lines) until
 it was reverted on 2026-10-27. Check for it before editing `interfaces` by
 hand.
 
+## Templates: one copy per host
+
+The `blue3-debian` template lives on local storage, and PVE cannot clone a
+template on local storage to another host. VMIDs are cluster-wide, so every
+host has its own copy under its own ID:
+
+| VMID | Host | Storage |
+|---|---|---|
+| 200 | b3p1 | `b3p1-hdd` (the original) |
+| 9201 | spx1 | `local-lvm` (RAID 1 of SSDs; spx1's `ssd` and `exthd` arrays were degraded) |
+| 9202 | pr9 | `pr9-ssd` |
+| 9203 | sgpu1 | `local-lvm` |
+
+The copies were made on 2026-11-17 from 200:
+
+1. One full clone of 200 into `b3p1-ssd`, reading `b3p1-hdd` at no more than
+   150 MiB/s (`--bwlimit 153600`), because that disk is shared with running
+   guests. The CD drive was emptied, since 200 points at an ISO only b3p1 has.
+2. Two more full clones from that copy, SSD to SSD.
+3. For each copy, an offline
+   `qm migrate <id> <host> --targetstorage <storage> --migration_network 100.64.65.0/24`
+   (60 GB over the 1G management link: about 5 minutes to spx1, 9 to pr9 and
+   sgpu1), then `qm template <id>` on the host.
+
+The copies are independent. A change made to 200 does not reach them; to
+change `blue3-debian`, change 200 and make the copies again.
+
+Like 200, the copies have `net0` on `vmbr0` with no VLAN tag. On pr9 and sgpu1,
+`vmbr0` is on the 10G trunk port, where an untagged NIC lands on the trunk's
+native VLAN, so give each clone its VLAN tag.
+
 ## History: the entry-point VMs (removed 2026-09-25)
 
 b3pve1 (100.64.100.254) and b3pve2 (100.64.100.253) were the original lab

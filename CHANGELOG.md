@@ -26,6 +26,10 @@ The package is unchanged, so the version stays the same.
   clock is synchronized.
 - [docs/cluster.md](docs/cluster.md): members table, the four-host quorum
   table, and the new hosts' bridges.
+- [docs/cluster.md](docs/cluster.md), *Templates*: a copy of `blue3-debian` on
+  every host (9201 spx1, 9202 pr9, 9203 sgpu1), because a template on local
+  storage cannot be cloned to another host.
+  [docs/access.md](docs/access.md) says what a colleague needs to clone them.
 - New queue snapshot [.continue/README_20261117.md](.continue/README_20261117.md).
 
 **2026-11-07**

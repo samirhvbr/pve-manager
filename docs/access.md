@@ -40,6 +40,12 @@ pveum acl modify /nodes/b3p1    --users $U --roles PVEAuditor        # see node 
 | `/vms/200` | `PVETemplateUser` | Clone the `blue3-debian` template (VMID 200 since 2026-09-25; it was 100) |
 | `/nodes/b3p1` | `PVEAuditor` | Read-only node summary: free RAM and CPU for sizing |
 
+The recipe covers b3p1 only. Each other host has its own copy of
+`blue3-debian` (9201 spx1, 9202 pr9, 9203 sgpu1; see
+[cluster.md](cluster.md#templates-one-copy-per-host)). To clone on one of them,
+the colleague also needs `PVETemplateUser` on `/vms/<id>` and
+`PVEDatastoreUser` on that host's storage.
+
 **The pool is mandatory when creating.** `VM.Allocate` is granted on the pool,
 so a VM created without `pool=<P>` is refused (403). Tell the colleague: in the
 *General* tab, pick the pool.
