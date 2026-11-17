@@ -84,9 +84,29 @@ b3p1 and spx1 have the same two bridges, with the same names, so a guest's
 config works on either node and ACLs on `/sdn/zones/localnetwork/<bridge>`
 cover both.
 
-pr9 and sgpu1 are different for now. Their `vmbr0` sits on the 1G copper port
-`nic0`, which also carries management and corosync, and they have no `vmbr1`.
-Their two 10G ports have QSFP-to-4×SFP+ breakout cables and no link yet.
+pr9 and sgpu1 (since 2026-11-17) separate the three roles on three ports. Their
+two 10G ports are legs of one QSFP-to-4×SFP+ breakout cable on switch port
+`Eth1/9` of `SW01-Servidores`, and the switch names them in LLDP:
+
+| Role | pr9 | sgpu1 | Switch side |
+|---|---|---|---|
+| management and corosync | `nic0` (1G copper), IP on the port itself, **no bridge** | `nic0`, same | access, management network |
+| guests: `vmbr0` | `nic6` | `nic4` | `ServerPort02/Trunk02` / `Trunk01`: tagged guest VLANs (1001, 50, 59, 1002, 1021, 1051) |
+| backups: VLAN 1098 | `nic7.1098`, `100.64.98.112/24` | `enp68s0f1.1098`, `100.64.98.111/24` | `ServerPort02/Backup02` / `Backup01`: 1098 **tagged** |
+
+- **The copper port has no bridge,** so the UI never offers it to a guest.
+- **Guest NICs on these nodes always carry a tag.** pr9's trunk also carries
+  untagged traffic from other networks.
+- **Backup traffic stays off the router.** VLAN 1098 has no gateway on the
+  hosts, so traffic to the PBS (`100.64.98.2`) leaves through that port.
+  b3p1 and spx1 still reach the PBS through the router.
+- **A tagged guest started before `vmbr0` moved keeps its old VLAN bridge.**
+  PVE created `vmbr0v<tag>` on the old port and does not rebuild it on
+  `ifreload`. Stop the guest, delete `vmbr0v<tag>` and `<oldport>.<tag>`, then
+  start it again.
+- Applied with a script that arms a 4-minute rollback before `ifreload`. The
+  rollback is cancelled only after these checks pass: gateway, PBS on 8007
+  through the 1098 port, corosync links, and 12 votes.
 
 | Bridge | Port | Kind | What it carries |
 |---|---|---|---|
