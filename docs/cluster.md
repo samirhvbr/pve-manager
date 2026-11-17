@@ -8,7 +8,8 @@ upgraded to the fork's base.
 One cluster that holds every physical host. **Any member serves the UI for the
 whole cluster.** There is no dedicated entry-point node. Use
 `100.64.65.160` or `100.64.65.202` (bare IP works, thanks to the 80/443
-redirect, which pr9 and sgpu1 do not have yet).
+redirect; pr9 and sgpu1 got it on 2026-11-17, but show the stock Proxmox
+branding until they get the fork).
 
 The name `blue3-lab` is left over from when the cluster was only the lab.
 Renaming it means editing `cluster_name` and restarting corosync on every
