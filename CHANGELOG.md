@@ -11,6 +11,26 @@ Entrada nova sempre **no topo**. Ver [CLAUDE.md](CLAUDE.md) para a convenção.
 
 ## 9.2.26+blue3.1 — Merge upstream pve-manager 9.2.26
 
+**2026-11-19: spx3 joins; the management-switch split**
+
+The package is unchanged, so the version stays the same.
+
+- spx3 joined with 3 votes, on a fresh install.
+  - The cluster now has 5 hosts, 15 votes and quorum 8, so any two hosts can
+    be down.
+  - spx3 has the same three-port layout as pr9 and sgpu1, and a storage
+    `spx3-ssd` on a RAID 1 of SSDs.
+  - It runs stock `pve-manager` 9.2.31 on hold until the fork is synced.
+- [docs/cluster.md](docs/cluster.md):
+  - the five-host quorum table;
+  - the 2–2 split of 2026-11-18: a management switch lost its unsaved
+    configuration, and both halves of the cluster went read-only;
+  - the one-side-only `pvecm expected` stopgap.
+- [docs/new-node.md](docs/new-node.md):
+  - do not `apt upgrade` a fresh node before the fork is held;
+  - what to do when upstream is ahead of the fork. `libpve-storage-perl`
+    9.1.18 breaks `pve-manager` older than 9.2.29.
+
 **2026-11-17: pr9 and sgpu1 join the cluster**
 
 The package is unchanged, so the version stays the same.

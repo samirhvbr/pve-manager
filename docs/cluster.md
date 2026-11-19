@@ -1,13 +1,15 @@
 # Cluster `blue3-lab` — topology and quorum
 
-**As of:** 2026-11-17 · All four nodes run `pve-manager 9.2.26+blue3.1` on
-hold. b3p1 and spx1 boot kernel 7.0.14-28; pr9 and sgpu1, which joined that
-day, boot 7.0.14-29.
+**As of:** 2026-11-19 · Five nodes. b3p1, spx1, pr9 and sgpu1 run
+`pve-manager 9.2.26+blue3.1` on hold. spx3, which joined that day, runs stock
+`pve-manager 9.2.31` on hold, until the fork catches up with upstream (see
+[new-node.md](new-node.md), *When upstream is ahead of the fork*). Kernels:
+7.0.14-28 on b3p1 and spx1, 7.0.14-29 on pr9 and sgpu1, 7.0.14-30 on spx3.
 
 One cluster that holds every physical host. **Any member serves the UI for the
 whole cluster.** There is no dedicated entry-point node. Use
 `100.64.65.160` or `100.64.65.202` (bare IP works, thanks to the 80/443
-redirect, installed on all four).
+redirect, installed on all five).
 
 The name `blue3-lab` is left over from when the cluster was only the lab.
 Renaming it means editing `cluster_name` and restarting corosync on every
@@ -23,14 +25,15 @@ node. That is deferred.
 | spx1 | 100.64.65.202 | physical host, production guests | 3 |
 | pr9 | 100.64.65.112 | physical host (Dell R720), no guests yet; joined 2026-11-17 | 3 |
 | sgpu1 | 100.64.65.111 | physical host (Dell R720) with a GPU passed through to one VM; joined 2026-11-17 | 3 |
+| spx3 | 100.64.65.113 | physical host (Dell R720), no guests yet; joined 2026-11-19 | 3 |
 
-Expected votes: 12, quorum: 7. HA is not configured, so losing quorum never
+Expected votes: 15, quorum: 8. HA is not configured, so losing quorum never
 fences or reboots anything: `/etc/pve` becomes read-only and guests keep
 running.
 
-How the two new hosts joined: [new-node.md](new-node.md) for pr9 (fresh
-install) and [join-existing-host.md](join-existing-host.md) for sgpu1 (one VM,
-renamed before the join).
+How the newer hosts joined: [new-node.md](new-node.md) for pr9 and spx3
+(fresh installs) and [join-existing-host.md](join-existing-host.md) for sgpu1
+(one VM, renamed before the join).
 
 ## Votes: 3 per physical host
 
@@ -40,18 +43,40 @@ exactly like 1 each. The rule exists so that the numbers stay right if a
 non-host member is ever added again. That was the case until 2026-09-25, see
 below.
 
-With four hosts, any one of them can be down:
+With five hosts, any two of them can be down:
 
-| Situation | Votes up | Quorate (≥ 7)? |
+| Situation | Votes up | Quorate (≥ 8)? |
 |---|---|---|
-| all four up | 12 | yes |
-| one host down or rebooting | 9 | yes. The others keep full management |
-| two hosts down | 6 | no. The remaining hosts' guests keep running but cannot be managed |
+| all five up | 15 | yes |
+| one or two hosts down, or cut off | 12 or 9 | yes. The others keep full management |
+| three hosts down | 6 | no. The remaining hosts' guests keep running but cannot be managed |
 
 Until 2026-11-17 the cluster had only b3p1 and spx1 (6 votes, quorum 4), so a
 reboot of either host left the other without quorum. *Rebooting a host* below
-was written in that period. With four hosts, rebooting one no longer costs
-quorum.
+was written in that period.
+
+**Why the fifth host matters: the split of 2026-11-18.** With four hosts, a
+2–2 split leaves both halves at 6 of 12 votes, and both become read-only.
+
+- **What happened:**
+  - pr9 and sgpu1 went down hard twice around 11:48 and came back.
+  - The management switch had rebooted with a configuration that had never
+    been saved, so their copper ports reached only each other.
+- **Effect:**
+  - on b3p1 and spx1, until the stopgap below at about 01:40, every config
+    change, snapshot rollback and the nightly backup failed with
+    `Permission denied` on `/etc/pve/...`;
+  - on sgpu1, for 22 hours, the VM with `onboot: 1` could not start.
+- **Stopgap that night:** `pvecm expected 6` on b3p1, which made b3p1 + spx1
+  writable. It is reset automatically when the other hosts return.
+  - Run it on **one** side only. Both halves writable at once is a split
+    brain, and one side's changes are lost when they merge.
+- **Reaching a host whose management port is cut off:** through its VLAN 1098
+  address, jumping via the backup server, e.g.
+  `ssh -o HostKeyAlias=100.64.65.112 -J root@<pbs> root@100.64.98.112`.
+- **After a switch change, save its configuration.**
+
+With five hosts, a 2–3 split leaves the three-host side writable.
 
 ## Rebooting a host
 
@@ -84,15 +109,21 @@ b3p1 and spx1 have the same two bridges, with the same names, so a guest's
 config works on either node and ACLs on `/sdn/zones/localnetwork/<bridge>`
 cover both.
 
-pr9 and sgpu1 (since 2026-11-17) separate the three roles on three ports. Their
-two 10G ports are legs of one QSFP-to-4×SFP+ breakout cable on switch port
-`Eth1/9` of `SW01-Servidores`, and the switch names them in LLDP:
+pr9 and sgpu1 (since 2026-11-17) and spx3 (since 2026-11-19) separate the
+three roles on three ports. pr9's and sgpu1's 10G ports are legs of one
+QSFP-to-4×SFP+ breakout cable on switch port `Eth1/9` of `SW01-Servidores`.
+spx3's are legs of another breakout to the same switch. The switch names them
+in LLDP:
 
-| Role | pr9 | sgpu1 | Switch side |
-|---|---|---|---|
-| management and corosync | `nic0` (1G copper), IP on the port itself, **no bridge** | `nic0`, same | access, management network |
-| guests: `vmbr0` | `nic6` | `nic4` | `ServerPort02/Trunk02` / `Trunk01`: tagged guest VLANs (1001, 50, 59, 1002, 1021, 1051) |
-| backups: VLAN 1098 | `nic7.1098`, `100.64.98.112/24` | `enp68s0f1.1098`, `100.64.98.111/24` | `ServerPort02/Backup02` / `Backup01`: 1098 **tagged** |
+| Role | pr9 | sgpu1 | spx3 | Switch side |
+|---|---|---|---|---|
+| management and corosync | `nic0` (1G copper), IP on the port itself, **no bridge** | `nic0`, same | `nic0`, same | access, management network |
+| guests: `vmbr0` | `nic6` | `nic4` | `nic4` | `ServerPort02/Trunk02` / `Trunk01`: tagged guest VLANs (1001, 50, 59, 1002, 1021, 1051) |
+| backups: VLAN 1098 | `nic7.1098`, `100.64.98.112/24` | `enp68s0f1.1098`, `100.64.98.111/24` | `nic5.1098`, `100.64.98.113/24` | `ServerPort02/Backup02` / `Backup01`: 1098 **tagged** |
+
+Both of spx3's switch ports announce themselves as `ServerPort02/Trunk01` in
+LLDP, the backup leg included. That is only the label on the switch; the VLANs
+seen on each port are what tell them apart.
 
 - **The copper port has no bridge,** so the UI never offers it to a guest.
 - **Guest NICs on these nodes always carry a tag.** pr9's trunk also carries

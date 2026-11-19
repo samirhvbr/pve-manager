@@ -1,6 +1,6 @@
 # Adding a server to the cluster
 
-**Written:** 2026-09-25 · **Applies to:** cluster `blue3-lab` (b3p1, spx1)
+**Written:** 2026-09-25 · **Updated:** 2026-11-19 · **Applies to:** cluster `blue3-lab`
 
 Checklist for a new node, in order. Each step links to the document with the
 detail. Nothing here is packaged in the `.deb`. The node-side configuration
@@ -58,6 +58,31 @@ ssh root@<new> pveversion                   # pve-manager/<ver>+blue3.<N>/<commi
 
 **Without the hold, the next `apt upgrade` reverts the node to stock Proxmox.**
 That happened on 2026-09-21. See [upstream-sync.md](upstream-sync.md).
+
+**A fresh install has no hold.** Do not run `apt upgrade` on it before the fork
+is installed. On 2026-11-19 a manual upgrade put stock 9.2.31 on spx3 before
+its join.
+
+### When upstream is ahead of the fork
+
+Proxmox moves the libraries together with `pve-manager`. Once upstream is
+ahead of the fork, the newest libraries refuse the fork. On 2026-11-19,
+`libpve-storage-perl` 9.1.18 declared `Breaks: pve-manager (<< 9.2.29)`, while
+the fork was 9.2.26+blue3.1. On a fresh node:
+
+- `apt full-upgrade` with `pve-manager` held keeps those libraries back, and
+  installing the fork together with their newest versions fails.
+- **Install the fork with the exact versions an existing member runs.** Take
+  them from `dpkg-query -W` on that member and pass them as `pkg=version`.
+  Every version the cluster uses is still in the no-subscription repository.
+- **If the node already has the newer stock packages,** do not downgrade 18
+  packages. Join on stock, keep `pve-manager` held, and install the fork with
+  the next upstream sync. Mixed minor versions in one cluster are normal
+  during an upgrade. Check that `corosync` is the same on both sides.
+
+The members already on the fork cannot take upstream updates of those
+libraries either, security fixes included, until the fork is synced
+([upstream-sync.md](upstream-sync.md)).
 
 ## 4. Web UI on 80/443
 
