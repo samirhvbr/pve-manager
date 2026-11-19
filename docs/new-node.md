@@ -19,10 +19,13 @@ lives in [`blue3-deploy/`](../blue3-deploy/) and is applied per node.
 - **Only one machine answers the IP.** Send ARP requests for it from a member
   and expect a single MAC. sgpu1 shared its address with its iDRAC, which
   showed up as a changed SSH host key.
-- **The clock is synchronized.** A host without internet access gets no NTP.
-  The office's AD domain controllers answer NTP; point chrony at them. pr9's
-  clock was 3 h behind because its hardware clock held local time; write it
-  back in UTC (`timedatectl set-local-rtc 0`, `hwclock --systohc --utc`).
+- **The clock is synchronized.** Point chrony at the company NTP server
+  `ntp.blue3.com.br`, by its internal address `100.64.66.230`:
+  `server 100.64.66.230 iburst prefer` in `/etc/chrony/sources.d/`. It also
+  works for a host without internet access. pr9's clock was 3 h behind on
+  2026-11-17, and spx4's on 2026-11-19, because the hardware clock held local
+  time. Write it back in UTC (`timedatectl set-local-rtc 0`,
+  `hwclock --systohc --utc`).
 - If the node was cloned from a template, regenerate `machine-id` and the SSH
   host keys. Detail: [lab.md](lab.md), *Preparação do SO*.
 

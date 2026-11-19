@@ -1,17 +1,17 @@
 # Cluster `blue3-lab` — topology and quorum
 
-**As of:** 2026-11-19 · Five nodes. spx1, pr9, sgpu1 and spx3 run
+**As of:** 2026-11-19 · Six nodes. spx1, pr9, sgpu1, spx3 and spx4 run
 `pve-manager 9.2.31+blue3.1` on hold. b3p1 is still on 9.2.26+blue3.1,
 because it had no route to the internet ([upstream-sync.md](upstream-sync.md),
 step 7). Kernels:
-- pr9, sgpu1 and spx3 boot 7.0.14-30;
+- pr9, sgpu1, spx3 and spx4 boot 7.0.14-30;
 - spx1 has 7.0.14-30 installed and still runs 7.0.14-28 until a planned reboot;
 - b3p1 runs 7.0.14-28.
 
 One cluster that holds every physical host. **Any member serves the UI for the
 whole cluster.** There is no dedicated entry-point node. Use
 `100.64.65.160` or `100.64.65.202` (bare IP works, thanks to the 80/443
-redirect, installed on all five).
+redirect, installed on all six).
 
 The name `blue3-lab` is left over from when the cluster was only the lab.
 Renaming it means editing `cluster_name` and restarting corosync on every
@@ -28,12 +28,13 @@ node. That is deferred.
 | pr9 | 100.64.65.112 | physical host (Dell R720); joined 2026-11-17; since 2026-11-19 runs VMs moved off b3p1 | 3 |
 | sgpu1 | 100.64.65.111 | physical host (Dell R720) with a GPU passed through to one VM; joined 2026-11-17 | 3 |
 | spx3 | 100.64.65.113 | physical host (Dell R720), no guests yet; joined 2026-11-19 | 3 |
+| spx4 | 100.64.65.114 | physical host (Dell R720xd), PVE and guests on a RAID 10 of six SSDs, no guests yet; joined 2026-11-19 | 3 |
 
-Expected votes: 15, quorum: 8. HA is not configured, so losing quorum never
+Expected votes: 18, quorum: 10. HA is not configured, so losing quorum never
 fences or reboots anything: `/etc/pve` becomes read-only and guests keep
 running.
 
-How the newer hosts joined: [new-node.md](new-node.md) for pr9 and spx3
+How the newer hosts joined: [new-node.md](new-node.md) for pr9, spx3 and spx4
 (fresh installs) and [join-existing-host.md](join-existing-host.md) for sgpu1
 (one VM, renamed before the join).
 
@@ -45,13 +46,13 @@ exactly like 1 each. The rule exists so that the numbers stay right if a
 non-host member is ever added again. That was the case until 2026-09-25, see
 below.
 
-With five hosts, any two of them can be down:
+With six hosts, any two of them can be down:
 
-| Situation | Votes up | Quorate (≥ 8)? |
+| Situation | Votes up | Quorate (≥ 10)? |
 |---|---|---|
-| all five up | 15 | yes |
-| one or two hosts down, or cut off | 12 or 9 | yes. The others keep full management |
-| three hosts down | 6 | no. The remaining hosts' guests keep running but cannot be managed |
+| all six up | 18 | yes |
+| one or two hosts down, or cut off | 15 or 12 | yes. The others keep full management |
+| three hosts down, or a 3–3 split | 9 | no. Guests keep running but cannot be managed, on both sides of a split |
 
 Until 2026-11-17 the cluster had only b3p1 and spx1 (6 votes, quorum 4), so a
 reboot of either host left the other without quorum. *Rebooting a host* below
@@ -78,7 +79,10 @@ was written in that period.
   `ssh -o HostKeyAlias=100.64.65.112 -J root@<pbs> root@100.64.98.112`.
 - **After a switch change, save its configuration.**
 
-With five hosts, a 2–3 split leaves the three-host side writable.
+With five hosts (spx3 joined that day), a 2–3 split left the three-host side
+writable. With six (spx4, also that day), a 3–3 split freezes both halves
+again. The fix is a tie-breaking vote outside the hosts (a QDevice), still to
+do.
 
 ## Moving a guest to another node
 

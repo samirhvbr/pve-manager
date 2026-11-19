@@ -11,6 +11,20 @@ Entrada nova sempre **no topo**. Ver [CLAUDE.md](CLAUDE.md) para a convenção.
 
 ## 9.2.31+blue3.1 — Merge upstream pve-manager 9.2.31
 
+**2026-11-19: spx4 joins; company NTP on every node**
+
+- spx4 joined with 3 votes, on a fresh install.
+  - Its five "WD Purple" HDDs looked counterfeit: placeholder serials and
+    non-WD firmware. Their RAID 5 was degraded and rebuilding, and it held the
+    first install.
+  - PVE was reinstalled on the RAID 10 of six SSDs, and the HDDs are out of
+    use.
+  - The cluster now has 6 hosts, 18 votes and quorum 10. A 3–3 split freezes
+    both halves, so a QDevice is pending.
+- Every node takes its time from `ntp.blue3.com.br` (100.64.66.230).
+  - [docs/new-node.md](docs/new-node.md) now points to it instead of the AD
+    domain controllers.
+
 **2026-11-19: the fork follows upstream to 9.2.31**
 
 - Merged upstream bump commit `30a00e01` (9.2.31), 125 upstream commits after
