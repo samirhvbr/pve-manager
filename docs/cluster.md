@@ -25,7 +25,7 @@ node. That is deferred.
 |---|---|---|---|
 | b3p1 | 100.64.65.160 | physical host | 3 |
 | spx1 | 100.64.65.202 | physical host, production guests | 3 |
-| pr9 | 100.64.65.112 | physical host (Dell R720), no guests yet; joined 2026-11-17 | 3 |
+| pr9 | 100.64.65.112 | physical host (Dell R720); joined 2026-11-17; since 2026-11-19 runs VMs moved off b3p1 | 3 |
 | sgpu1 | 100.64.65.111 | physical host (Dell R720) with a GPU passed through to one VM; joined 2026-11-17 | 3 |
 | spx3 | 100.64.65.113 | physical host (Dell R720), no guests yet; joined 2026-11-19 | 3 |
 
@@ -79,6 +79,36 @@ was written in that period.
 - **After a switch change, save its configuration.**
 
 With five hosts, a 2–3 split leaves the three-host side writable.
+
+## Moving a guest to another node
+
+Live, with its local disks, over the management network:
+
+```bash
+qm migrate <id> <node> --online 1 --with-local-disks 1 \
+  --targetstorage <node-storage> --migration_network 100.64.65.0/24
+```
+
+First done on 2026-11-19: two VMs moved from b3p1 to pr9. Each was paused
+for less than 100 ms, and a 660 GB VM took 25 min.
+
+- **Snapshots block it.** A VM with a snapshot on a local disk cannot move,
+  live or offline, between `lvmthin` storages. Delete the snapshot first, with
+  the owner's agreement.
+- **An ISO in the CD drive blocks it** when the ISO storage is local to the
+  source. Empty the drive first.
+- **Unused disks move too.** Delete an `unusedN` disk the VM no longer needs
+  before migrating.
+- **The copy is fully allocated on the target.** The disk mirror writes every
+  block, empty ones included, so thin volumes arrive 100 % allocated. Run
+  `fstrim -av` inside the guest afterwards to give the space back to the thin
+  pool. The disks have `discard=on`, so the trim reaches the pool. The room
+  check must therefore count each disk's declared size, not its used size.
+- **The guest's network does not change.** A NIC on `vmbr0` with a VLAN tag
+  lands on the target's `vmbr0v<tag>`. On pr9, sgpu1 and spx3 that bridge sits
+  on the 10G port.
+- **Node-to-node SSH from a script** must use the per-node host key, the way
+  PVE does: `-o HostKeyAlias=<node> -o UserKnownHostsFile=/etc/pve/nodes/<node>/ssh_known_hosts`.
 
 ## Rebooting a host
 
