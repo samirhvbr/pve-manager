@@ -23,6 +23,15 @@ Entrada nova sempre **no topo**. Ver [CLAUDE.md](CLAUDE.md) para a convenção.
   - The nodes on 9.2.26+blue3.1 could not take that library or the others
     released with it, security fixes included.
   - spx3 had joined on stock 9.2.31.
+- Built on the build VM after bringing its packages to 9.2.31.
+- Installed and held on spx3, pr9, sgpu1 and spx1, one at a time, with the
+  cluster at 15 votes throughout.
+  - pr9 and sgpu1 rebooted into kernel 7.0.14-30.
+  - b3p1 waits: it has had no internet route since 2026-11-07.
+- [docs/upstream-sync.md](docs/upstream-sync.md):
+  - update the build VM first;
+  - apt over IPv4 only;
+  - every node needs to reach the Proxmox repository.
 
 ## 9.2.26+blue3.1 — Merge upstream pve-manager 9.2.26
 

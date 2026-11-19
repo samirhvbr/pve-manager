@@ -1,10 +1,12 @@
 # Cluster `blue3-lab` — topology and quorum
 
-**As of:** 2026-11-19 · Five nodes. b3p1, spx1, pr9 and sgpu1 run
-`pve-manager 9.2.26+blue3.1` on hold. spx3, which joined that day, runs stock
-`pve-manager 9.2.31` on hold, until the fork catches up with upstream (see
-[new-node.md](new-node.md), *When upstream is ahead of the fork*). Kernels:
-7.0.14-28 on b3p1 and spx1, 7.0.14-29 on pr9 and sgpu1, 7.0.14-30 on spx3.
+**As of:** 2026-11-19 · Five nodes. spx1, pr9, sgpu1 and spx3 run
+`pve-manager 9.2.31+blue3.1` on hold. b3p1 is still on 9.2.26+blue3.1,
+because it had no route to the internet ([upstream-sync.md](upstream-sync.md),
+step 7). Kernels:
+- pr9, sgpu1 and spx3 boot 7.0.14-30;
+- spx1 has 7.0.14-30 installed and still runs 7.0.14-28 until a planned reboot;
+- b3p1 runs 7.0.14-28.
 
 One cluster that holds every physical host. **Any member serves the UI for the
 whole cluster.** There is no dedicated entry-point node. Use

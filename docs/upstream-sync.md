@@ -1,7 +1,7 @@
 # Following upstream without losing the fork
 
 **First done:** 2026-09-24 · 9.2.10+blue3.1 → 9.2.20+blue3.1  
-**Last done:** 2026-11-07 · 9.2.20+blue3.1 → 9.2.26+blue3.1
+**Last done:** 2026-11-19 · 9.2.26+blue3.1 → 9.2.31+blue3.1
 
 ---
 
@@ -101,6 +101,13 @@ The 9.2.10 → 9.2.20 and 9.2.20 → 9.2.26 syncs found none.
 
 ### 6. Build on a lab node, as a non-root user
 
+The build VM is `b3pve1`, a standalone PVE with no guests. **Bring its
+packages to the target release first.** The new `Build-Depends` ask for the
+libraries released with the new upstream, and those can `Break` the old fork
+installed on the build VM. In the 9.2.31 sync, `libpve-storage-perl` 9.1.18
+broke `pve-manager << 9.2.29`. The build VM therefore took stock 9.2.31 for
+the build, then the freshly built fork as its first install.
+
 ```bash
 su - samir -c 'cd ~/build-X/pve-manager && make check && make deb'
 ```
@@ -122,6 +129,16 @@ The `.deb` is written to the checkout directory. The Makefile builds in a
 subdirectory and writes to its parent.
 
 ### 7. Install on each node, one at a time
+
+**Use IPv4 for apt.** The nodes have no IPv6 route, and on 2026-11-19 apt on
+pr9 failed downloads on `download.proxmox.com`'s IPv6 address. Pass
+`-o Acquire::ForceIPv4=true -o Acquire::Retries=3`.
+
+**Every node needs to reach `download.proxmox.com`.** On 2026-11-19, b3p1 had
+had no route to the internet since 2026-11-07: its traffic stopped at the
+second hop, while spx1, behind the same gateway, passed. b3p1 stayed on
+9.2.26+blue3.1 until that was fixed. A node can run one fork version behind
+the others; the cluster works with mixed minor versions.
 
 Install the fork in the **same apt transaction** as the packages the hold kept
 back. With the old fork on hold, `apt full-upgrade` keeps back every package
