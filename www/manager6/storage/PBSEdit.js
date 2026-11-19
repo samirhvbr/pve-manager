@@ -229,7 +229,8 @@ Ext.define('PVE.panel.PBSEncryptionKeyTab', {
                 // new style fingerprint
                 let shortKeyFP = PVE.Utils.render_pbs_fingerprint(cryptKeyInfo);
                 values['crypt-key-fp'] =
-                    icon + `${gettext('Active')} - ${gettext('Fingerprint')} ${shortKeyFP}`;
+                    icon +
+                    `${gettext('Active')} - ${gettext('Fingerprint')} ${Ext.htmlEncode(shortKeyFP)}`;
             } else {
                 // old key without FP
                 values['crypt-key-fp'] = icon + gettext('Active');
@@ -266,6 +267,7 @@ Ext.define('PVE.panel.PBSEncryptionKeyTab', {
         {
             xtype: 'displayfield',
             name: 'crypt-key-fp',
+            htmlEncode: false,
             fieldLabel: gettext('Encryption Key'),
             padding: '2 0',
         },

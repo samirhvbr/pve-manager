@@ -7,6 +7,7 @@ PERLSOURCE = 			\
 	ACMEAccount.pm		\
 	ACMEPlugin.pm		\
 	APT.pm			\
+	AccessLog.pm		\
 	Backup.pm		\
 	Capabilities.pm		\
 	Ceph.pm			\
@@ -17,6 +18,7 @@ PERLSOURCE = 			\
 	Network.pm		\
 	NodeConfig.pm		\
 	Nodes.pm		\
+	Plugins.pm		\
 	Pool.pm			\
 	Replication.pm		\
 	ReplicationConfig.pm	\

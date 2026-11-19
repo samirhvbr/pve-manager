@@ -496,6 +496,8 @@ sub send_notification {
     my $policy = $opts->{mailnotification} // 'always';
     my $mode = $opts->{"notification-mode"} // 'auto';
 
+    return if $mode eq 'none';
+
     sanitize_task_list($tasklist);
     my ($error_count, $total_size) = aggregate_task_statistics($tasklist);
 
@@ -1284,6 +1286,11 @@ sub exec_backup_task {
     };
     my $err = $@;
 
+    # The task can still fail after the plugin's archive step succeeded, e.g. when marking the
+    # backup as protected or pruning. Let the plugin cleanup know, so it does not finalize state
+    # as if the backup was kept.
+    $task->{err} = $err if $err;
+
     if ($plugin) {
         # clean-up
 
@@ -1375,7 +1382,12 @@ sub exec_backup_task {
                 debugmsg('warn', "$@") if $@; # $@ contains already error prefix
             }
         } elsif ($self->{'backup-provider'}) {
-            $self->{'backup-provider'}->backup_handle_log_file($vmid, $task->{tmplog});
+            eval { $self->{'backup-provider'}->backup_handle_log_file($vmid, $task->{tmplog}); };
+            if (my $log_err = $@) {
+                debugmsg('warn', "handling backup task log by external provider failed - $log_err");
+                # stopping the job while the provider handles the log must still abort the job
+                $err = $log_err if $log_err =~ m/^interrupted by signal$/;
+            }
         } elsif ($task->{logfile}) {
             system {'cp'} 'cp', $task->{tmplog}, $task->{logfile};
         }

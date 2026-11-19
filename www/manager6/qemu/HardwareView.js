@@ -203,7 +203,8 @@ Ext.define('PVE.qemu.HardwareView', {
                         PVE.Utils.is_windows(ostype) &&
                         (!machineType || machineType === 'pc' || machineType === 'q35')
                     ) {
-                        let meta = me.getObjectValue('meta', undefined, pending);
+                        // 'meta' is read-only, a pending change of it is never applied
+                        let meta = me.getObjectValue('meta');
                         let creationQemu;
                         if (meta) {
                             creationQemu = PVE.Parser.parsePropertyString(meta)['creation-qemu'];
@@ -472,8 +473,10 @@ Ext.define('PVE.qemu.HardwareView', {
             }
         };
 
-        let edit_btn = new Proxmox.button.Button({
+        let edit_btn = new Proxmox.button.AltText({
             text: gettext('Edit'),
+            defaultText: gettext('Edit'),
+            altText: gettext('Attach'),
             selModel: sm,
             disabled: true,
             handler: run_editor,
@@ -631,7 +634,7 @@ Ext.define('PVE.qemu.HardwareView', {
             },
         });
 
-        let remove_btn = new Proxmox.button.Button({
+        let remove_btn = new Proxmox.button.AltText({
             text: gettext('Remove'),
             defaultText: gettext('Remove'),
             altText: gettext('Detach'),
@@ -676,21 +679,6 @@ Ext.define('PVE.qemu.HardwareView', {
                         }
                     },
                 });
-            },
-            listeners: {
-                render: function (btn) {
-                    // hack: calculate the max button width on first display to prevent the whole
-                    // toolbar to move when we switch between the "Remove" and "Detach" labels
-                    var def = btn.getSize().width;
-
-                    btn.setText(btn.altText);
-                    var alt = btn.getSize().width;
-
-                    btn.setText(btn.defaultText);
-
-                    var optimal = alt > def ? alt : def;
-                    btn.setSize({ width: optimal });
-                },
             },
         });
 
@@ -816,6 +804,10 @@ Ext.define('PVE.qemu.HardwareView', {
                     isCloudInit ||
                     (isCDRom && !cdromCap) ||
                     (isDisk && !diskCap),
+            );
+
+            edit_btn.setText(
+                isUnusedDisk && !isCloudInit ? edit_btn.altText : edit_btn.defaultText,
             );
 
             diskaction_btn.setDisabled(

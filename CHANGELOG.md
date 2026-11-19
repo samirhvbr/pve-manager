@@ -9,6 +9,21 @@ Entrada nova sempre **no topo**. Ver [CLAUDE.md](CLAUDE.md) para a convenção.
 
 ---
 
+## 9.2.31+blue3.1 — Merge upstream pve-manager 9.2.31
+
+**2026-11-19: the fork follows upstream to 9.2.31**
+
+- Merged upstream bump commit `30a00e01` (9.2.31), 125 upstream commits after
+  9.2.26.
+  - Only `debian/changelog` conflicted.
+  - Branding, Blue3 links and the removed subscription notice merged
+    unchanged, and upstream added no new branding points under `www/`.
+- Why now: upstream `libpve-storage-perl` 9.1.18 declares
+  `Breaks: pve-manager (<< 9.2.29)`.
+  - The nodes on 9.2.26+blue3.1 could not take that library or the others
+    released with it, security fixes included.
+  - spx3 had joined on stock 9.2.31.
+
 ## 9.2.26+blue3.1 — Merge upstream pve-manager 9.2.26
 
 **2026-11-19: spx3 joins; the management-switch split**

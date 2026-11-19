@@ -692,9 +692,10 @@ sub migrated_info {
     );
     like(
         $output,
-        qr/needed a first complete measurement; no possibly stale session is currently visible.*complete measurement is now recorded.*Repeat the confirmation/s,
-        'the refusal describes an empty measurement grammatically',
+        qr/INFO: the first complete client measurement of 'client\.app' is recorded and shows no session.*Repeat '--confirm-clients-refreshed client\.app'/s,
+        'an empty measurement explains the repeat',
     );
+    unlike($output, qr/FAIL/, 'an empty measurement is not reported as a failure');
 
     {
         no warnings qw(once redefine);
@@ -711,6 +712,83 @@ sub migrated_info {
         defined($state->{client_refresh}->{'client.app'}->{cleared}),
         'the repeated confirmation closes it',
     );
+}
+
+{
+    my $preflight = sub {
+        my ($state, $opts, @ids) = @_;
+        my $output = '';
+        no warnings qw(once redefine);
+        local *main::file_set_contents = sub { };
+        open(my $stdout, '>', \$output) or die $!;
+        local *STDOUT = $stdout;
+        my $verdict = $HOOKS->{preflight}->(
+            migrated_info(picture(1, @ids)), { apply => 1, %$opts }, 0, $state,
+        );
+        return ($verdict, $output);
+    };
+
+    for my $case (
+        [
+            '--confirm-clients-refreshed client.app',
+            { 'confirm-clients-refreshed' => ['client.app'] },
+        ],
+        ['--confirm-all-clients-refreshed', { 'confirm-all-clients-refreshed' => 1 }],
+    ) {
+        my ($option, $opts) = @$case;
+        my $unmeasured = sub {
+            return {
+                client_keys_seen => { 'client.app' => key_fingerprint($NEW) },
+                client_refresh =>
+                    { 'client.app' => { rotated => 1, measurement_incomplete => 1 } },
+            };
+        };
+
+        my $state = $unmeasured->();
+        my ($verdict, $output) = $preflight->($state, $opts);
+        cmp_ok($verdict, '<', 0, "$option still refuses after an empty measurement");
+        like(
+            $output,
+            qr/INFO: the first complete client measurement.*Repeat '\Q$option\E'/s,
+            "$option explains the repeat",
+        );
+        unlike($output, qr/FAIL/, "$option reports no failure for an empty measurement");
+        ok(!defined($state->{client_refresh}->{'client.app'}->{cleared}), "$option closes nothing");
+        ($verdict) = $preflight->($state, $opts);
+        cmp_ok($verdict, '>=', 0, "repeating $option is accepted");
+        ok(defined($state->{client_refresh}->{'client.app'}->{cleared}),
+            "repeating $option closes");
+
+        $state = $unmeasured->();
+        ($verdict, $output) = $preflight->($state, $opts, 40);
+        cmp_ok($verdict, '<', 0, "$option refuses with a possibly stale client");
+        like(
+            $output,
+            qr/FAIL: not accepting '\Q$option\E' yet: the first complete client measurement of 'client\.app'.*1 session\(s\) that may still hold the previous key \(node40/s,
+            "$option names that client as a failure",
+        );
+        is_deeply(
+            $state->{client_refresh}->{'client.app'}->{session_ids},
+            [40],
+            "$option records that client",
+        );
+    }
+
+    # a key rotated by hand and then confirmed, with its clients already refreshed
+    my $state = { client_keys_seen => { 'client.app' => key_fingerprint($OLD) } };
+    my $opts = { 'confirm-clients-refreshed' => ['client.app'] };
+    my ($verdict, $output) = $preflight->($state, $opts);
+    like(
+        $output,
+        qr/WARN: the key of 'client\.app' was changed outside this script$/m,
+        'a key changed by hand is announced',
+    );
+    cmp_ok($verdict, '<', 0, 'its first confirmation records the measurement');
+    unlike($output, qr/FAIL/, 'and is not a failure');
+    ($verdict, $output) = $preflight->($state, $opts);
+    cmp_ok($verdict, '>=', 0, 'its second confirmation is accepted');
+    unlike($output, qr/changed outside/, 'without announcing the same change again');
+    ok(defined($state->{client_refresh}->{'client.app'}->{cleared}), 'and closes the record');
 }
 
 {
@@ -2298,6 +2376,59 @@ sub run_aggregate_confirmation {
 
 {
     my ($rados, $info, $state) =
+        aggregate_fixture({ complete => 1, clients => {} }, qw(client.ready client.blocked));
+    $info->{sessions}->{clients}->{'client.blocked'} =
+        [{ global_id => 101, host => 'node-b' }];
+    my $verdict;
+    {
+        no warnings qw(once redefine);
+        local *main::file_set_contents = sub { };
+        $verdict = $HOOKS->{preflight}->(
+            $info,
+            { apply => 1, 'confirm-clients-refreshed' => [qw(client.ready client.blocked)] },
+            0,
+            $state,
+            {},
+        );
+    }
+    cmp_ok($verdict, '<', 0, 'one recorded connected client refuses a list of users');
+    is_deeply($rados->{committed}, [], 'the ready staged key of the list is not committed first');
+    ok(
+        !defined($state->{client_refresh}->{'client.ready'}->{cleared})
+            && !defined($state->{client_refresh}->{'client.blocked'}->{cleared}),
+        'no record of the list is closed',
+    );
+}
+
+for my $opts (
+    { 'confirm-clients-refreshed' => [qw(client.a client.b)] },
+    { 'confirm-all-clients-refreshed' => 1 },
+) {
+    # a recorded client is connected while the first complete measurement is still open
+    my ($option) = keys %$opts;
+    my ($rados, $info, $state) =
+        aggregate_fixture({ complete => 1, clients => {} }, qw(client.a client.b));
+    $state->{client_refresh}->{'client.b'}->{measurement_incomplete} = 1;
+    $info->{sessions}->{clients}->{'client.b'} = [{ global_id => 101, host => 'node-b' }];
+    my $run = sub {
+        my $output = '';
+        no warnings qw(once redefine);
+        local *main::file_set_contents = sub { };
+        open(my $stdout, '>', \$output) or die $!;
+        local *STDOUT = $stdout;
+        my $verdict = $HOOKS->{preflight}->($info, { apply => 1, %$opts }, 0, $state, {});
+        return ($verdict, $output);
+    };
+    my ($verdict, $output) = $run->();
+    my @failures = $output =~ m/^FAIL:/mg;
+    ok($verdict < 0 && scalar(@failures) == 1, "$option reports that client once");
+    $info->{sessions}->{clients} = {};
+    ($verdict) = $run->();
+    cmp_ok($verdict, '>=', 0, "$option is accepted in the next run once that client is gone");
+}
+
+{
+    my ($rados, $info, $state) =
         aggregate_fixture({ complete => 0, clients => {} }, qw(client.store client.admin));
     my ($verdict, $output);
     {
@@ -2471,6 +2602,46 @@ sub run_aggregate_confirmation {
         exists($state->{staged}->{'client.b'})
             && !defined($state->{client_refresh}->{'client.b'}->{cleared}),
         'the newly blocked key and its refresh record remain open',
+    );
+}
+
+{
+    my ($rados, $info, $state) =
+        aggregate_fixture({ complete => 1, clients => {} }, qw(client.a client.b));
+    $rados->{entries}->{'client.b'} = { entity => 'client.b', key => $NEW };
+    $info->{exported}->{'client.b'} = { $rados->{entries}->{'client.b'}->%* };
+    delete $state->{staged}->{'client.b'};
+    $state->{client_keys_seen}->{'client.b'} = key_fingerprint($NEW);
+    my $poll = 0;
+    my $collector = sub {
+        my $sessions = { complete => 1, clients => {} };
+        $sessions->{clients}->{'client.b'} = [{ global_id => 101, host => 'node-b' }]
+            if ++$poll >= 2;
+        return { sessions => $sessions };
+    };
+    my ($verdict, @saved);
+    {
+        no warnings qw(once redefine);
+        local *main::file_set_contents = sub { push @saved, decode_json($_[1]) };
+        $verdict = $HOOKS->{preflight}->(
+            $info,
+            { apply => 1, 'confirm-all-clients-refreshed' => 1 },
+            0,
+            $state,
+            {},
+            $collector,
+        );
+    }
+    cmp_ok(
+        $verdict,
+        '<',
+        0,
+        'a session appearing for a later record without a staged key refuses it',
+    );
+    is_deeply($rados->{committed}, ['client.a'], 'the commit before it stays');
+    ok(
+        !scalar(grep { defined($_->{client_refresh}->{'client.b'}->{cleared}) } @saved),
+        'that record is never saved as closed',
     );
 }
 
@@ -3460,6 +3631,28 @@ sub run_aggregate_confirmation {
         qr/contradict each other for client\.cp/,
         'confirming and aborting the same key is refused',
     );
+}
+
+{
+    my $help = $HOOKS->{usage}->();
+    for my $option (qw(
+        apply assume-yes verbose timeout force only restart-daemons rotate-cluster-keys
+        rotate-mon-key rotate-client-keys rotate-lockbox-keys rotate-admin-key
+        rotate-all-storage-keys rotate-storage-key abort-staged-key
+        confirm-abort-clients-refreshed confirm-clients-refreshed
+        confirm-all-clients-refreshed restrict-ciphers wipe-rotating-keys
+    ))
+    {
+        # an unknown option prints the help and returns a status, a known one may die later
+        local @ARGV = ("--$option", $option eq 'timeout' ? '5' : 'x');
+        local *STDERR;
+        open(STDERR, '>', \my $discarded) or die $!;
+        my (undef, $status) = eval { $HOOKS->{parse_options}->() };
+        ok(
+            !defined($status) && $help =~ m/^  --\Q$option\E\b/m,
+            "the published option '--$option' stays accepted and documented",
+        );
+    }
 }
 
 {
@@ -5701,8 +5894,6 @@ for my $case ([0, 0], [1, 0], [0, 1], [1, 1]) {
         'measurement adds no target-key IDs and preserves previously recorded history',
     );
     $info->{sessions}->{clients}->{'client.admin'} = $fresh_mounts;
-    is($run->(), -1, 'singular confirmation measures only after the connected blocker clears')
-        if !$aggregate && !$recorded_mounts;
     ok(
         !$state->{client_refresh}->{'client.admin'}->{measurement_incomplete},
         'the complete measurement does not require refreshing the target-key mounts',
@@ -6756,14 +6947,19 @@ for my $case ([0, 0], [1, 0], [0, 1], [1, 1]) {
 
     my $daemon = { type => 'mgr', id => 'a', entity => 'mgr.a', node => 'node-a.foreign.invalid' };
     for my $case (
-        ['missing inventory', {}, qr/unique data directory/],
+        ['missing inventory', {}, qr/reports no data directory for it/],
         [
             'duplicate ID',
             {
                 'node-a' => { a => { direxists => 1 } },
                 'node-b' => { a => { direxists => 1 } },
             },
-            qr/unique data directory/,
+            qr/reports a data directory for it on several nodes: 'node-a', 'node-b'/,
+        ],
+        [
+            'directory on another node only',
+            { 'node-b' => { a => { direxists => 1 } } },
+            qr/reports a data directory for it only on: 'node-b'/,
         ],
         ['failed inventory', undef, qr/inventory is unavailable/],
     ) {
@@ -6797,6 +6993,43 @@ for my $case ([0, 0], [1, 0], [0, 1], [1, 1]) {
         );
     };
     like($@, qr/label does not identify/, 'a reused OSD ID cannot authorize a fallback write');
+
+    my $osd_probe = {
+        store => 'block',
+        'label-whoami' => 7,
+        'label-fsid' => 'cluster-fsid',
+        'label-osd-uuid' => 'osd-uuid',
+    };
+    my $assert_osd = sub {
+        my ($probe) = @_;
+        my $candidate = { %$osd, node => 'node-a.foreign.invalid' };
+        return eval {
+            $HOOKS->{assert_daemon_location}
+                ->($rados, $candidate, 'cluster-fsid', $probe // $osd_probe);
+            1;
+        };
+    };
+    $inventory = {
+        'node-a' => { 7 => { direxists => 1 } },
+        'node-b' => { 7 => { direxists => 1 } },
+    };
+    ok($assert_osd->(), 'the label identifies an OSD despite a remnant of its ID elsewhere');
+    for my $case (
+        ['ID', { %$osd_probe, 'label-whoami' => 8 }],
+        ['cluster', { %$osd_probe, 'label-fsid' => 'other-fsid' }],
+        ['UUID', { %$osd_probe, 'label-osd-uuid' => 'reused-uuid' }],
+    ) {
+        my ($what, $probe) = @$case;
+        ok(!$assert_osd->($probe), "a remnant does not excuse another $what in the label");
+        like($@, qr/label does not identify/, "the label with another $what is what refuses");
+    }
+    $inventory = { 'node-b' => { 7 => { direxists => 1 } } };
+    ok(!$assert_osd->(), 'an OSD without a data directory on its reported node is refused');
+    like(
+        $@,
+        qr/reports a data directory for it only on: 'node-b'/,
+        'the refusal names the other node',
+    );
 
     for my $node ('foreign.invalid', PVE::INotify::nodename()) {
         local *PVE::Cluster::get_nodelist = sub { ['node-a'] };

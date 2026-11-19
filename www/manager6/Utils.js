@@ -444,6 +444,27 @@ Ext.define('PVE.Utils', {
 
         renderNotFound: (what) => Ext.String.format(gettext('No {0} found'), what),
 
+        // monStoreErrors would mask the field of a combo box, not its picker list
+        monPickerStoreErrors: function (combo, store) {
+            let picker = combo.getPicker();
+            picker.mon(store, 'beforeload', function () {
+                picker.unmask();
+                delete picker.minHeight;
+            });
+            picker.mon(store.proxy, 'afterload', function (proxy, request, success) {
+                if (success) {
+                    Proxmox.Utils.setErrorMask(picker, false);
+                    return;
+                }
+                let error = request._operation.getError();
+                let msg = Proxmox.Utils.getResponseErrorMessage(error);
+                if (msg) {
+                    picker.minHeight = 100;
+                }
+                Proxmox.Utils.setErrorMask(picker, msg);
+            });
+        },
+
         get_kvm_osinfo: function (value) {
             var info = { base: 'Other' }; // default
             if (value) {
@@ -745,6 +766,23 @@ Ext.define('PVE.Utils', {
             rootdir: gettext('Container'),
             snippets: gettext('Snippets'),
             import: gettext('Import'),
+            'vm-vol': gettext('VM Disk'),
+            'vm-state': gettext('VM State'),
+            'ct-vol': gettext('Container Volume'),
+        },
+
+        genericContentType: {
+            'vm-vol': 'images',
+            'vm-state': 'images',
+            'ct-vol': 'rootdir',
+        },
+
+        // Whether the content types of a storage, an array or a comma separated list, allow the
+        // given type. A generic type allows its volume types and is allowed by any of them.
+        contentAllows: function (content, type) {
+            let generic = PVE.Utils.genericContentType;
+            let list = Ext.isString(content) ? content.split(',') : Ext.Array.from(content);
+            return list.some((ct) => ct === type || ct === generic[type] || generic[ct] === type);
         },
 
         // volume can be a full volume info object, in which case the format parameter is ignored, or
@@ -896,11 +934,6 @@ Ext.define('PVE.Utils', {
                 ipanel: 'PBSInputPanel',
                 faIcon: 'floppy-o',
                 backups: true,
-            },
-            drbd: {
-                name: 'DRBD',
-                hideAdd: true,
-                backups: false,
             },
             esxi: {
                 name: 'ESXi',
@@ -1394,7 +1427,7 @@ Ext.define('PVE.Utils', {
         // expecting the following format:
         // [v2:10.10.10.1:6802/2008,v1:10.10.10.1:6803/2008]
         render_ceph_osd_addr: function (value) {
-            value = value.trim();
+            value = Ext.htmlEncode(value.trim());
             if (value.startsWith('[') && value.endsWith(']')) {
                 value = value.slice(1, -1); // remove []
             }
@@ -2208,7 +2241,7 @@ Ext.define('PVE.Utils', {
             hastart: ['HA', gettext('Start')],
             hastop: ['HA', gettext('Stop')],
             imgcopy: ['', gettext('Copy data')],
-            imgdel: ['', gettext('Erase data')],
+            imgdel: ['', gettext('Destroy image')],
             lvmcreate: [gettext('LVM Storage'), gettext('Create')],
             lvmremove: ['Volume Group', gettext('Remove')],
             lvmthincreate: [gettext('LVM-Thin Storage'), gettext('Create')],

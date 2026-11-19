@@ -57,7 +57,7 @@ Ext.define('PVE.tree.ResourceTree', {
                 let text = info.text;
                 let status = '';
                 if (info.type === 'storage') {
-                    let usage = info.disk / info.maxdisk;
+                    let usage = info.diskuse;
                     if (usage >= 0.0 && usage <= 1.0) {
                         let barHeight = (usage * 100).toFixed(0);
                         let remainingHeight = (100 - barHeight).toFixed(0);
@@ -192,9 +192,9 @@ Ext.define('PVE.tree.ResourceTree', {
             qtips.push(Ext.String.format(gettext('HA State: {0}'), info.hastate));
         }
         if (info.type === 'storage') {
-            let usage = info.disk / info.maxdisk;
+            let usage = info.diskuse;
             if (usage >= 0.0 && usage <= 1.0) {
-                qtips.push(Ext.String.format(gettext('Usage: {0}%'), (usage * 100).toFixed(2)));
+                qtips.push(Ext.String.format(gettext('Usage: {0}%'), (usage * 100).toFixed(1)));
             }
         }
 
@@ -333,8 +333,6 @@ Ext.define('PVE.tree.ResourceTree', {
         let stateid = 'rid';
 
         const changedFields = [
-            'disk',
-            'maxdisk',
             'vmid',
             'name',
             'type',
@@ -379,6 +377,7 @@ Ext.define('PVE.tree.ResourceTree', {
         let updateTree = function () {
             store.suspendEvents();
 
+            let anyChanged = false;
             let rootnode;
             if (firstUpdate) {
                 rootnode = Ext.create('PVETree', {
@@ -432,14 +431,30 @@ Ext.define('PVE.tree.ResourceTree', {
                         }
                     }
 
-                    // tree item has been updated
-                    for (const field of changedFields) {
-                        if (item.data[field] !== olditem.data[field]) {
+                    let diskUsage = item.data.diskuse;
+                    let oldDiskUsage = olditem.data.diskuse;
+
+                    if (diskUsage !== undefined && oldDiskUsage !== undefined) {
+                        // we have an old and new value, so check if it changed enough
+                        if (Math.abs(diskUsage - oldDiskUsage) >= 0.001) {
                             changed = true;
-                            break;
                         }
+                    } else if (diskUsage !== undefined || oldDiskUsage !== undefined) {
+                        // we have either a new or an old value, but not both,
+                        // always treat that as a change
+                        changed = true;
                     }
-                    // FIXME: also test filterfn()?
+
+                    if (!changed) {
+                        // tree item has been updated
+                        for (const field of changedFields) {
+                            if (item.data[field] !== olditem.data[field]) {
+                                changed = true;
+                                break;
+                            }
+                        }
+                        // FIXME: also test filterfn()?
+                    }
                 }
 
                 if (changed) {
@@ -451,6 +466,7 @@ Ext.define('PVE.tree.ResourceTree', {
                     }
                     me.setIconCls(info);
                     olditem.commit();
+                    anyChanged = true;
                 }
                 if ((!item || moved) && olditem.isLeaf()) {
                     delete index[key];
@@ -468,6 +484,8 @@ Ext.define('PVE.tree.ResourceTree', {
                         let grandParent = parentNode.parentNode;
                         grandParent.removeChild(parentNode, true);
                     }
+
+                    anyChanged = true;
                 }
             }
 
@@ -487,10 +505,13 @@ Ext.define('PVE.tree.ResourceTree', {
                 if (child) {
                     index[item.data.id] = child;
                 }
+                anyChanged = true;
             });
 
             store.resumeEvents();
-            store.fireEvent('refresh', store);
+            if (anyChanged) {
+                store.fireEvent('refresh', store);
+            }
 
             let foundChild = findNode(rootnode, lastsel?.data.id);
 
@@ -649,6 +670,9 @@ Ext.define('PVE.tree.ResourceTree', {
                     return true;
                 },
             });
+
+            // some nodes need rerendering here, e.g. for tag colors
+            me.store.fireEvent('refresh', me.store);
         });
     },
 });

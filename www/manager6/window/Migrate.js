@@ -31,6 +31,7 @@ Ext.define('PVE.window.Migrate', {
                 hasLocalResources: false,
                 withConntrackState: true,
                 bothHaveDbusVmstate: false,
+                configCheck: true,
             },
         },
         formulas: {
@@ -148,6 +149,10 @@ Ext.define('PVE.window.Migrate', {
 
             if (vm.get('migration.bothHaveDbusVmstate') && vm.get('migration.withConntrackState')) {
                 params['with-conntrack-state'] = 1;
+            }
+
+            if (!vm.get('migration.configCheck')) {
+                params['skip-config-check'] = 1;
             }
 
             Proxmox.Utils.API2Request({
@@ -363,6 +368,7 @@ Ext.define('PVE.window.Migrate', {
             }
 
             if (migrateStats.local_disks.length) {
+                let volumeTypes = new Set();
                 migrateStats.local_disks.forEach(function (disk) {
                     if (disk.cdrom && disk.cdrom === 1) {
                         if (!disk.volid.includes('vm-' + vm.get('vmid') + '-cloudinit')) {
@@ -385,7 +391,9 @@ Ext.define('PVE.window.Migrate', {
                         migration['with-local-disks'] = 1;
                         migration.preconditions.push({ text, severity: 'warning' });
                     }
+                    volumeTypes.add(disk.is_vmstate ? 'vm-state' : 'vm-vol');
                 });
+                migration.volumeTypes = [...volumeTypes].sort();
             }
 
             migration.bothHaveDbusVmstate =
@@ -466,6 +474,13 @@ Ext.define('PVE.window.Migrate', {
 
                     migration.preconditions.push({ text, severity: 'warning' });
                 }
+            }
+
+            if (!vm.get('migration.configCheck')) {
+                const text = gettext(
+                    'Without the config check, an outdated target node might drop configuration settings it cannot parse.',
+                );
+                migration.preconditions.push({ text, severity: 'warning' });
             }
 
             vm.set('migration', migration);
@@ -563,6 +578,13 @@ Ext.define('PVE.window.Migrate', {
                 }
             }
 
+            if (!vm.get('migration.configCheck')) {
+                const text = gettext(
+                    'Without the config check, an outdated target node might drop or ignore configuration settings it cannot parse.',
+                );
+                migration.preconditions.push({ text, severity: 'warning' });
+            }
+
             vm.set('migration', migration);
         },
     },
@@ -602,6 +624,26 @@ Ext.define('PVE.window.Migrate', {
                                 value: '{setMigrationMode}',
                             },
                         },
+                        {
+                            xtype: 'proxmoxcheckbox',
+                            name: 'configCheck',
+                            fieldLabel: gettext('Config Check'),
+                            autoEl: {
+                                tag: 'div',
+                                'data-qtip': gettext(
+                                    'Check that the target node can parse the guest configuration.',
+                                ),
+                            },
+                            bind: {
+                                value: '{migration.configCheck}',
+                            },
+                            listeners: {
+                                change: {
+                                    fn: 'checkMigratePreconditions',
+                                    extraArg: true,
+                                },
+                            },
+                        },
                     ],
                 },
                 {
@@ -631,6 +673,7 @@ Ext.define('PVE.window.Migrate', {
                             emptyText: gettext('Current layout'),
                             bind: {
                                 hidden: '{setStorageselectorHidden}',
+                                volumeTypes: '{migration.volumeTypes}',
                             },
                         },
                         {

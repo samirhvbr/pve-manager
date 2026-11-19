@@ -217,15 +217,17 @@ Ext.define('PVE.lxc.RessourceView', {
             });
         };
 
-        var edit_btn = new Proxmox.button.Button({
+        let edit_btn = new Proxmox.button.AltText({
             text: gettext('Edit'),
+            defaultText: gettext('Edit'),
+            altText: gettext('Attach'),
             selModel: me.selModel,
             disabled: true,
             enableFn: function (rec) {
                 if (!rec) {
                     return false;
                 }
-                var rowdef = rows[rec.data.key];
+                let rowdef = rows[rec.data.key];
                 return !!rowdef.editor;
             },
             handler: function () {
@@ -233,7 +235,7 @@ Ext.define('PVE.lxc.RessourceView', {
             },
         });
 
-        var remove_btn = new Proxmox.button.Button({
+        var remove_btn = new Proxmox.button.AltText({
             text: gettext('Remove'),
             defaultText: gettext('Remove'),
             altText: gettext('Detach'),
@@ -254,21 +256,6 @@ Ext.define('PVE.lxc.RessourceView', {
                 return msg;
             },
             handler: run_remove,
-            listeners: {
-                render: function (btn) {
-                    // hack: calculate the max button width on first display to prevent the whole
-                    // toolbar to move when we switch between the "Remove" and "Detach" labels
-                    let def = btn.getSize().width;
-
-                    btn.setText(btn.altText);
-                    let alt = btn.getSize().width;
-
-                    btn.setText(btn.defaultText);
-
-                    let optimal = alt > def ? alt : def;
-                    btn.setSize({ width: optimal });
-                },
-            },
         });
 
         let move_menuitem = new Ext.menu.Item({
@@ -332,6 +319,7 @@ Ext.define('PVE.lxc.RessourceView', {
                 }
             }
             edit_btn.setDisabled(noedit);
+            edit_btn.setText(isUnusedDisk ? edit_btn.altText : edit_btn.defaultText);
 
             volumeaction_btn.setDisabled(!isDisk || !diskCap);
             move_menuitem.setDisabled(isUnusedDisk);

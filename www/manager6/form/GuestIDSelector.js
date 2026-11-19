@@ -22,12 +22,12 @@ Ext.define('PVE.form.GuestIDSelector', {
             return true;
         }
 
-        if (me.validateExists === true && !me.exists) {
+        if (me.validateExists === true && !me.rejected) {
             return me.unknownID;
         }
 
-        if (me.validateExists === false && me.exists) {
-            return me.inUseID;
+        if (me.validateExists === false && me.rejected) {
+            return me.nextIDError;
         }
 
         return true;
@@ -62,11 +62,20 @@ Ext.define('PVE.form.GuestIDSelector', {
                         url: '/cluster/nextid',
                         method: 'GET',
                         success: function (response, opts) {
-                            me.exists = false;
+                            me.rejected = false;
                             me.validate();
                         },
                         failure: function (response, opts) {
-                            me.exists = true;
+                            me.rejected = true;
+                            // prefer translated message if guest is known to the UI
+                            if (PVE.data.ResourceStore.findVMID(newValue)) {
+                                me.nextIDError = me.inUseID;
+                            } else {
+                                let error = response.result?.errors?.vmid;
+                                me.nextIDError = error
+                                    ? Ext.htmlEncode(error.trim())
+                                    : response.htmlStatus;
+                            }
                             me.validate();
                         },
                     });

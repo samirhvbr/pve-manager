@@ -80,7 +80,7 @@ Ext.define('PVE.ceph.Services', {
 
                         let severityIcon = PVE.Utils.get_ceph_icon_html(value.severity, true);
                         let details = value.detail.reduce((acc, v) => `${acc}\n${v.message}`, '');
-                        monmessages[monid].messages.push(severityIcon + details);
+                        monmessages[monid].messages.push(severityIcon + Ext.htmlEncode(details));
 
                         if (healthstates[value.severity] < monmessages[monid].worstSeverity) {
                             monmessages[monid].worstSeverity = healthstates[value.severity];
@@ -98,7 +98,7 @@ Ext.define('PVE.ceph.Services', {
 
             if (status.fsmap) {
                 status.fsmap.by_rank.forEach(function (mds) {
-                    mdsmessages[mds.name] = 'rank: ' + mds.rank + '; ' + mds.status;
+                    mdsmessages[mds.name] = Ext.htmlEncode(`rank: ${mds.rank}; ${mds.status}`);
                 });
             }
         }
@@ -147,25 +147,30 @@ Ext.define('PVE.ceph.Services', {
             me[type] = {};
 
             for (let id of ids) {
+                let getProp = function (prop) {
+                    let value = metadata[type][id][prop];
+                    if (value !== undefined && value !== null) {
+                        return Ext.htmlEncode(value);
+                    }
+                    return undefined;
+                };
+                // keep ID, name and host raw, they are keys into the metadata and status maps
                 const [name, host] = id.split('@');
                 let result = {
-                    id: id,
+                    id,
                     health: healthstates.HEALTH_OK,
                     statuses: [],
                     messages: [],
-                    name: name,
-                    title: metadata[type][id].name || name,
-                    host: host,
+                    name,
+                    title: getProp('name') || Ext.htmlEncode(name),
+                    host,
                     version: PVE.Utils.parse_ceph_version(metadata[type][id]),
-                    service: metadata[type][id].service,
-                    addr:
-                        metadata[type][id].addr ||
-                        metadata[type][id].addrs ||
-                        Proxmox.Utils.unknownText,
+                    service: getProp('service'),
+                    addr: getProp('addr') || getProp('addrs') || Proxmox.Utils.unknownText,
                 };
 
                 result.statuses = [
-                    gettext('Host') + ': ' + host,
+                    gettext('Host') + ': ' + Ext.htmlEncode(host),
                     gettext('Address') + ': ' + result.addr,
                 ];
 
@@ -185,7 +190,9 @@ Ext.define('PVE.ceph.Services', {
                 }
 
                 if (result.version) {
-                    result.statuses.push(gettext('Version') + ': ' + result.version);
+                    result.statuses.push(
+                        gettext('Version') + ': ' + Ext.htmlEncode(result.version),
+                    );
 
                     if (PVE.Utils.compare_ceph_versions(result.version, maxversion) !== 0) {
                         let host_version =

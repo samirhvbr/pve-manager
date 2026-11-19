@@ -360,7 +360,7 @@ Ext.define('PVE.dc.OptionView', {
             minValue: 1,
             maxValue: 64, // arbitrary but generous limit as limits are good
         });
-        me.add_inputpanel_row('next-id', gettext('Next Free VMID Range'), {
+        me.add_inputpanel_row('next-id', gettext('Next Free Guest ID'), {
             renderer: PVE.Utils.render_as_property_string,
             url: '/api2/extjs/cluster/options',
             items: [
@@ -382,8 +382,218 @@ Ext.define('PVE.dc.OptionView', {
                     maxValue: 1000 * 1000 * 1000 - 1,
                     submitValue: true,
                 },
+                {
+                    xtype: 'proxmoxcheckbox',
+                    name: 'unique',
+                    fieldLabel: gettext('Unique'),
+                    boxLabel: gettext('Only suggest guest IDs that were never used'),
+                    value: 0,
+                },
+                {
+                    xtype: 'proxmoxcheckbox',
+                    name: 'enforce',
+                    fieldLabel: gettext('Enforce'),
+                    boxLabel: gettext(
+                        'Reject guest IDs outside the range or, with unique, guest IDs that were used before',
+                    ),
+                    value: 0,
+                },
             ],
         });
+        me.rows['token-policy'] = {
+            required: true,
+            header: gettext('API Token Policy'),
+            renderer: function (policy) {
+                if (!policy) {
+                    return Proxmox.Utils.NoneText;
+                }
+                let parts = [];
+                if (Number(policy['require-expiry'])) {
+                    parts.push(gettext('Require Expiration Date'));
+                }
+                if (policy['max-lifetime'] !== undefined) {
+                    let lifetime = Proxmox.Utils.format_duration_human(
+                        Number(policy['max-lifetime']),
+                    );
+                    parts.push(Ext.String.format(gettext('Max. Lifetime: {0}'), lifetime));
+                }
+                if (Number(policy['default-to-max-lifetime'])) {
+                    parts.push(gettext('Default to Max. Lifetime'));
+                }
+                if (Number(policy['disallow-expiry-extension'])) {
+                    parts.push(gettext('Disallow Extending Expiration'));
+                }
+                if (Number(policy['allow-extension-on-regenerate'])) {
+                    parts.push(gettext('Allow Extension on Regeneration'));
+                }
+                if (Number(policy['require-privilege-separation'])) {
+                    parts.push(gettext('Require Privilege Separation'));
+                }
+                return parts.length ? parts.join(', ') : Proxmox.Utils.NoneText;
+            },
+            editor: {
+                xtype: 'proxmoxWindowEdit',
+                subject: gettext('API Token Policy'),
+                onlineHelp: 'pveum_token_policy',
+                url: '/api2/extjs/cluster/options',
+                width: 450,
+                fieldDefaults: {
+                    labelWidth: 200,
+                },
+                setValues: function (values) {
+                    let me = this;
+                    // max-lifetime is stored in seconds but edited in days; keep the exact stored
+                    // value for saving an untouched field
+                    let policy = Ext.apply({}, values['token-policy'] || {});
+                    me.storedMaxLifetime = policy['max-lifetime'];
+                    // the maximum lifetime may lock the checkbox before it gets set below
+                    me.down('field[name=require-expiry]').explicitValue = !!Number(
+                        policy['require-expiry'],
+                    );
+                    if (policy['max-lifetime'] !== undefined) {
+                        policy['max-lifetime'] =
+                            Math.ceil((Number(policy['max-lifetime']) / 86400) * 100) / 100;
+                    }
+                    Ext.Array.each(me.query('inputpanel'), (panel) => panel.setValues(policy));
+                },
+                items: [
+                    {
+                        xtype: 'inputpanel',
+                        onGetValues: function (values) {
+                            let me = this;
+                            let win = me.up('proxmoxWindowEdit');
+                            let policy = {};
+                            // read the field directly, it is disabled and thus not part of the
+                            // values while a maximum lifetime implies it
+                            if (me.down('field[name=require-expiry]').getValue()) {
+                                policy['require-expiry'] = 1;
+                            }
+                            if (values['default-to-max-lifetime']) {
+                                policy['default-to-max-lifetime'] = 1;
+                            }
+                            if (values['disallow-expiry-extension']) {
+                                policy['disallow-expiry-extension'] = 1;
+                            }
+                            if (values['allow-extension-on-regenerate']) {
+                                policy['allow-extension-on-regenerate'] = 1;
+                            }
+                            if (values['require-privilege-separation']) {
+                                policy['require-privilege-separation'] = 1;
+                            }
+                            let days = values['max-lifetime'];
+                            if (days !== undefined && days !== null && days !== '') {
+                                let untouched = !me.down('field[name=max-lifetime]').isDirty();
+                                policy['max-lifetime'] =
+                                    untouched && win.storedMaxLifetime !== undefined
+                                        ? win.storedMaxLifetime
+                                        : Math.round(Number(days) * 86400);
+                            }
+                            if (Object.keys(policy).length === 0) {
+                                return { delete: 'token-policy' };
+                            }
+                            return { 'token-policy': PVE.Parser.printPropertyString(policy) };
+                        },
+                        items: [
+                            {
+                                xtype: 'proxmoxcheckbox',
+                                name: 'require-expiry',
+                                uncheckedValue: 0,
+                                fieldLabel: gettext('Require Expiration Date'),
+                                listeners: {
+                                    // remember an explicit choice to restore it once a maximum
+                                    // lifetime no longer implies it
+                                    change: function (field, value) {
+                                        if (!field.isDisabled()) {
+                                            field.explicitValue = value;
+                                        }
+                                    },
+                                },
+                            },
+                            {
+                                xtype: 'numberfield',
+                                name: 'max-lifetime',
+                                minValue: 0.01,
+                                emptyText: gettext('No limit'),
+                                fieldLabel: gettext('Maximum Lifetime (days)'),
+                                listeners: {
+                                    // a maximum lifetime implies requiring an expiration date,
+                                    // show that by locking the checkbox on
+                                    change: function (field, value) {
+                                        let requireExpiry = field
+                                            .up('inputpanel')
+                                            .down('field[name=require-expiry]');
+                                        let implied = value !== null && value !== undefined;
+                                        // lock before setting, to keep the remembered choice
+                                        requireExpiry.setDisabled(implied);
+                                        requireExpiry.setValue(
+                                            implied || !!requireExpiry.explicitValue,
+                                        );
+                                        let defaultToMax = field
+                                            .up('inputpanel')
+                                            .down('field[name=default-to-max-lifetime]');
+                                        defaultToMax.setDisabled(!implied);
+                                        if (!implied) {
+                                            defaultToMax.setValue(false);
+                                        }
+                                    },
+                                },
+                            },
+                            {
+                                xtype: 'proxmoxcheckbox',
+                                name: 'default-to-max-lifetime',
+                                uncheckedValue: 0,
+                                disabled: true,
+                                fieldLabel: gettext('Default to Max. Lifetime'),
+                                autoEl: {
+                                    tag: 'div',
+                                    'data-qtip': gettext(
+                                        'Give tokens created without an expiration date the maximum lifetime instead of rejecting them.',
+                                    ),
+                                },
+                            },
+                            {
+                                xtype: 'proxmoxcheckbox',
+                                name: 'disallow-expiry-extension',
+                                uncheckedValue: 0,
+                                fieldLabel: gettext('Disallow Extending Expiration'),
+                                listeners: {
+                                    // allowing an extension on regeneration only makes sense
+                                    // while extending is disallowed in general
+                                    change: function (field, value) {
+                                        let allowOnRegenerate = field
+                                            .up('inputpanel')
+                                            .down('field[name=allow-extension-on-regenerate]');
+                                        allowOnRegenerate.setDisabled(!value);
+                                        if (!value) {
+                                            allowOnRegenerate.setValue(false);
+                                        }
+                                    },
+                                },
+                            },
+                            {
+                                xtype: 'proxmoxcheckbox',
+                                name: 'allow-extension-on-regenerate',
+                                uncheckedValue: 0,
+                                disabled: true,
+                                fieldLabel: gettext('Allow Extension on Regeneration'),
+                                autoEl: {
+                                    tag: 'div',
+                                    'data-qtip': gettext(
+                                        'Allow extending the expiration date of a token when its secret is regenerated at the same time.',
+                                    ),
+                                },
+                            },
+                            {
+                                xtype: 'proxmoxcheckbox',
+                                name: 'require-privilege-separation',
+                                uncheckedValue: 0,
+                                fieldLabel: gettext('Require Privilege Separation'),
+                            },
+                        ],
+                    },
+                ],
+            },
+        };
         me.rows['tag-style'] = {
             required: true,
             renderer: (value) => {
@@ -617,6 +827,7 @@ Ext.define('PVE.dc.OptionView', {
             }
 
             PVE.UIOptions.options['tag-style'] = store.getById('tag-style')?.data?.value;
+            PVE.UIOptions.options['token-policy'] = store.getById('token-policy')?.data?.value;
             PVE.UIOptions.updateTagSettings(PVE.UIOptions.options['tag-style']);
             PVE.UIOptions.fireUIConfigChanged();
         });

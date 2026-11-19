@@ -92,9 +92,14 @@ sub auth_handler {
         } else {
             die "No ticket\n" if !$ticket;
 
+            # FIXME: Once we depend on libpve-access-control >= 9.2.1, `$tfa_info`
+            # will always be `undef` and its handling can be removed.
             my $tfa_info;
             eval {
                 ($username, $age, $tfa_info) = PVE::AccessControl::verify_ticket($ticket);
+                if (ref($username)) {
+                    die "missing 2nd factor\n";
+                }
                 $rpcenv->check_user_enabled($username);
             };
             if (my $err = $@) {
@@ -103,10 +108,8 @@ sub auth_handler {
             }
 
             if (defined($tfa_info)) {
-                if (defined(my $challenge = $tfa_info->{challenge})) {
-                    $rpcenv->set_u2f_challenge($challenge);
-                }
-                die "No ticket\n" if ($rel_uri ne '/access/tfa' || $method ne 'POST');
+                # Only set for legacy TFA auth - see note above.
+                die "No ticket\n";
             }
         }
 

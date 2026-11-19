@@ -12,6 +12,7 @@ use URI qw();
 
 use LWP::UserAgent;
 
+use Proxmox::APT::HistoryAPI;
 use Proxmox::RS::APT::Repositories;
 
 use PVE::pvecfg;
@@ -71,8 +72,13 @@ __PACKAGE__->register_method({
 
         my $res = [
             { id => 'changelog' },
+            { id => 'history' },
+            { id => 'installed-changelog' },
             { id => 'repositories' },
+            { id => 'termlog' },
+            { id => 'transaction-changelogs' },
             { id => 'update' },
+            { id => 'update-changelogs' },
             { id => 'versions' },
         ];
 
@@ -123,6 +129,26 @@ my $assemble_pkginfo = sub {
 
 # we try to cache results
 my $pve_pkgstatus_fn = "/var/lib/pve-manager/pkgupdates";
+my $changelog_cache_dir = "/var/cache/pve-manager/apt-changelogs";
+
+# The pending updates as package changes for the changelog bindings.
+my sub pending_update_changes {
+    my ($updates) = @_;
+
+    return [
+        map {
+            my $old = $_->{OldVersion};
+            my $installed = defined($old) && $old ne '';
+            {
+                package => $_->{Package},
+                arch => $_->{Arch},
+                action => $installed ? 'upgrade' : 'install',
+                'old-version' => $installed ? $old : undef,
+                'new-version' => $_->{Version},
+            }
+        } $updates->@*
+    ];
+}
 my $read_cached_pkgstatus = sub {
     my $data =
         eval { decode_json(PVE::Tools::file_get_contents($pve_pkgstatus_fn, 5 * 1024 * 1024)) }
@@ -253,7 +279,7 @@ __PACKAGE__->register_method({
     method => 'GET',
     description => "List available updates.",
     permissions => {
-        check => ['perm', '/nodes/{node}', ['Sys.Modify']],
+        check => ['perm', '/nodes/{node}', ['Sys.Audit', 'Sys.Modify'], any => 1],
     },
     protected => 1,
     proxyto => 'node',
@@ -289,6 +315,44 @@ __PACKAGE__->register_method({
         return $pkglist;
     },
 });
+
+__PACKAGE__->register_method({
+    name => 'update_changelogs',
+    path => 'update-changelogs',
+    method => 'GET',
+    description => "Get the changelog entries for pending updates, grouped by source package.",
+    permissions => {
+        check => ['perm', '/nodes/{node}', ['Sys.Modify']],
+    },
+    # Refreshing the update cache and reading repository credentials require root.
+    protected => 1,
+    proxyto => 'node',
+    parameters => {
+        additionalProperties => 0,
+        properties => {
+            node => get_standard_option('pve-node'),
+        },
+    },
+    returns => Proxmox::APT::HistoryAPI::changelogs_schema(),
+    code => sub {
+        my ($param) = @_;
+
+        my $changes = pending_update_changes(__PACKAGE__->list_updates($param));
+
+        return Proxmox::RS::APT::History::update_changelogs($changes, $changelog_cache_dir);
+    },
+});
+
+# Downloads the changelogs of the pending updates into the cache of the update-changelogs endpoint,
+# if it got used in the last 30 days. Returns how many it downloaded and how many failed with the
+# first error, or undef if it did not run.
+sub prefetch_update_changelogs {
+    my ($class, $node) = @_;
+
+    my $changes = pending_update_changes($class->list_updates({ node => $node }));
+
+    return Proxmox::RS::APT::History::prefetch_update_changelogs($changes, $changelog_cache_dir);
+}
 
 __PACKAGE__->register_method({
     name => 'update_database',
@@ -478,6 +542,22 @@ __PACKAGE__->register_method({
         return $output;
     },
 });
+
+__PACKAGE__->register_method(Proxmox::APT::HistoryAPI::history_method({
+    check => ['perm', '/nodes/{node}', ['Sys.Audit']],
+}));
+
+__PACKAGE__->register_method(Proxmox::APT::HistoryAPI::term_log_method({
+    check => ['perm', '/nodes/{node}', ['Sys.Syslog']],
+}));
+
+__PACKAGE__->register_method(Proxmox::APT::HistoryAPI::installed_changelog_method({
+    check => ['perm', '/nodes/{node}', ['Sys.Audit']],
+}));
+
+__PACKAGE__->register_method(Proxmox::APT::HistoryAPI::transaction_changelogs_method({
+    check => ['perm', '/nodes/{node}', ['Sys.Audit']],
+}));
 
 __PACKAGE__->register_method({
     name => 'repositories',

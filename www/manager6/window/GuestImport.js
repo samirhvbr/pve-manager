@@ -179,10 +179,10 @@ Ext.define('PVE.window.GuestImport', {
                         let warning = gettext('Too many disks, could not map to SATA.');
                         prefix = `<i data-qtip="${warning}" class="fa fa-exclamation-triangle warning"></i> `;
                     }
-                    return `${prefix}${mappedID}`;
+                    return `${prefix}${Ext.htmlEncode(mappedID)}`;
                 }
             }
-            return value;
+            return Ext.htmlEncode(value);
         },
 
         refreshGrids: function () {
@@ -267,7 +267,7 @@ Ext.define('PVE.window.GuestImport', {
             let me = this;
             let vm = me.getViewModel();
 
-            return !vm.get('uniqueMACAdresses') && value ? value : 'auto';
+            return !vm.get('uniqueMACAdresses') && value ? Ext.htmlEncode(value) : 'auto';
         },
 
         control: {
@@ -654,6 +654,7 @@ Ext.define('PVE.window.GuestImport', {
                             xtype: 'displayfield',
                             reference: 'warningText',
                             userCls: 'pmx-hint',
+                            htmlEncode: false,
                             hidden: true,
                             bind: {
                                 hidden: '{hideWarnings}',
@@ -711,7 +712,7 @@ Ext.define('PVE.window.GuestImport', {
                                     dataIndex: 'import-from',
                                     flex: 1,
                                     renderer: function (value) {
-                                        return value.replace(/^.*\//, '');
+                                        return Ext.htmlEncode(value.replace(/^.*\//, ''));
                                     },
                                 },
                                 {
@@ -721,7 +722,7 @@ Ext.define('PVE.window.GuestImport', {
                                         if (Ext.isNumeric(value)) {
                                             return Proxmox.Utils.render_size(value);
                                         }
-                                        return value ?? Proxmox.Utils.unknownText;
+                                        return Ext.htmlEncode(value ?? Proxmox.Utils.unknownText);
                                     },
                                 },
                                 {
@@ -829,6 +830,7 @@ Ext.define('PVE.window.GuestImport', {
                                     text: gettext('Slot'),
                                     dataIndex: 'id',
                                     sorted: true,
+                                    renderer: Ext.htmlEncode,
                                 },
                                 {
                                     text: gettext('Storage'),
@@ -898,6 +900,7 @@ Ext.define('PVE.window.GuestImport', {
                                 {
                                     text: gettext('ID'),
                                     dataIndex: 'id',
+                                    renderer: Ext.htmlEncode,
                                 },
                                 {
                                     text: gettext('MAC address'),
@@ -975,8 +978,18 @@ Ext.define('PVE.window.GuestImport', {
                                 ],
                             },
                             columns: [
-                                { header: gettext('Key'), width: 150, dataIndex: 'key' },
-                                { header: gettext('Value'), flex: 1, dataIndex: 'value' },
+                                {
+                                    header: gettext('Key'),
+                                    width: 150,
+                                    dataIndex: 'key',
+                                    renderer: Ext.htmlEncode,
+                                },
+                                {
+                                    header: gettext('Value'),
+                                    flex: 1,
+                                    dataIndex: 'value',
+                                    renderer: Ext.htmlEncode,
+                                },
                             ],
                         },
                     ],
@@ -1003,7 +1016,10 @@ Ext.define('PVE.window.GuestImport', {
         me.callParent();
 
         me.setTitle(
-            Ext.String.format(gettext('Import Guest - {0}'), `${me.storage}:${me.volumeName}`),
+            Ext.String.format(
+                gettext('Import Guest - {0}'),
+                Ext.htmlEncode(`${me.storage}:${me.volumeName}`),
+            ),
         );
 
         me.lookup('defaultStorage').setNodename(me.nodename);
@@ -1039,9 +1055,13 @@ Ext.define('PVE.window.GuestImport', {
             };
             let message = warningsCatalogue[w.type];
             if (!w.type || !message) {
-                return w.message ?? w.type ?? gettext('Unknown warning');
+                return Ext.htmlEncode(w.message ?? w.type ?? gettext('Unknown warning'));
             }
-            return Ext.String.format(message, w.key ?? 'unknown', w.value ?? 'unknown');
+            return Ext.String.format(
+                message,
+                Ext.htmlEncode(w.key ?? 'unknown'),
+                Ext.htmlEncode(w.value ?? 'unknown'),
+            );
         };
 
         me.load({
@@ -1051,7 +1071,7 @@ Ext.define('PVE.window.GuestImport', {
 
                 let disks = [];
                 for (const [id, value] of Object.entries(data.disks ?? {})) {
-                    let volid = Ext.htmlEncode('<none>');
+                    let volid = '<none>';
                     let size = 'auto';
                     if (Ext.isObject(value)) {
                         volid = value.volid;
